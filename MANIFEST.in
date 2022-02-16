@@ -1,0 +1,8 @@
+include COPYING
+include VERSION
+include CMakeLists.txt
+include Doxyfile.in
+include version_info.py
+graft src
+graft lib
+graft wrap

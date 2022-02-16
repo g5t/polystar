@@ -1,0 +1,54 @@
+*.py[cod]
+*~
+MANIFEST
+
+# C extensions
+*.so
+*.lo
+*.o
+python/src
+
+# Packages
+*.egg
+*.egg-info
+
+# Installer logs
+pip-log.txt
+
+# Unit test / coverage reports
+.coverage
+.tox
+nosetests.xml
+
+# Translations
+*.mo
+
+# Mr Developer
+.mr.developer.cfg
+.project
+.pydevproject
+
+# Doc
+.buildinfo
+.doctrees
+*.db
+api/
+.doctree
+pages/
+
+# Various build directories
+*build
+*dist
+cmake-build*
+
+# Built version header
+src/version.hpp
+
+# Pipenv environment files
+Pipfile
+Pipfile.lock
+.snakemake
+.status_flag*
+
+# CLion
+.idea/

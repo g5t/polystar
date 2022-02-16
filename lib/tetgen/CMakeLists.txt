@@ -1,0 +1,11 @@
+if (MSVC)
+  add_compile_options(/O2)
+else()
+  add_compile_options(-O3)
+endif()
+
+set(TETGEN_SOURCES tetgen.cxx predicates.cxx)
+foreach(CXX_TARGET IN LISTS CXX_TARGETS)
+  target_sources(${CXX_TARGET} PRIVATE ${TETGEN_SOURCES})
+  target_include_directories(${CXX_TARGET} PUBLIC ${CMAKE_CURRENT_LIST_DIR})
+endforeach()
