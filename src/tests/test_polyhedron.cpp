@@ -194,7 +194,6 @@ TEST_CASE("Polyhedron IO","[polyhedron][io]"){
     // write the Polyhedron to the file:
     auto filename = filepath.string();
     std::string dataset="/polyhedron";
-    std::cout << "Writing to file " << filename << std::endl;
     REQUIRE(poly.to_hdf(filename, dataset));
 
     // read-back the file's Polyhedron
@@ -202,25 +201,13 @@ TEST_CASE("Polyhedron IO","[polyhedron][io]"){
 
     // ensure that the two Polyhedra are identical
     auto rv = read.get_vertices();
-    auto rp = read.get_points();
-    auto rn = read.get_normals();
-    auto rfpv = read.get_faces_per_vertex();
     auto rvpf = read.get_vertices_per_face();
-
-    auto p = poly.get_points();
-    auto n = poly.get_normals();
-    auto fpv = poly.get_faces_per_vertex();
 
     for (unsigned int i=0; i<2u; ++i){
       REQUIRE(verts.size(i) == rv.size(i));
-      REQUIRE(p.size(i) == rp.size(i));
-      REQUIRE(n.size(i) == rn.size(i));
     }
     for (const auto & s: verts.subItr()) REQUIRE(verts[s] == rv[s]);
-    for (const auto & s: p.subItr()) REQUIRE(p[s] == rp[s]);
-    for (const auto & s: n.subItr()) REQUIRE(n[s] == rn[s]);
 
-    REQUIRE(lists_match(fpv, rfpv));
     REQUIRE(lists_match(vpf, rvpf));
 
     // (over)write to the file again, just to ensure it doesn't raise an error

@@ -27,6 +27,7 @@ along with brille. If not, see <https://www.gnu.org/licenses/>.            */
 #include "array_.hpp" // defines bArray
 #include "utilities.hpp"
 namespace brille {
+
   template<class T> bArray<T> three_point_normal(const bArray<T>& a, const bArray<T>& b, const bArray<T>& c){
     auto n = cross(b - a, c - b);
     return n / norm(n);
@@ -77,11 +78,6 @@ std::vector<T> bare_winding_angles(const bArray<T>& vecs, const ind_t i, const b
   }
   return angles;
 }
-//! Determine the squared area of a triangle from the lengths of its sides
-template<class T> static T triangle_area_squared(const T a, const T b, const T c){
-  T s = (a+b+c)/2;
-  return s*(s-a)*(s-b)*(s-c);
-}
 //! Check whether the points defining a Polyhedron facet encompass a finite area
 template<class T>
 bool face_has_area(const bArray<T>& points, const bool strict=false){
@@ -109,42 +105,30 @@ bool face_has_area(const bArray<T>& points, const bool strict=false){
     s += piece;
   }
   return (s > T(0));
+}
 //
-//  auto p0 = points.view(0);
-//  T s=0;
-//  bArray<T> a,b;
-//  for (ind_t i=1; i<points.size(0)-1; ++i){
-//    a = points.view(i)-p0;
-//    for (ind_t j=i+1; j<points.size(0); ++j){
-//      b = points.view(j)-p0;
-//      s += triangle_area_squared(a.norm(0), b.norm(0), (a-b).norm(0));
-//    }
-//  }
-//  return brille::approx::scalar(s, T(0)) ? 0 : 1;
-}
-
-//! Check whether two sizes are compatible for broadcasting
-static inline bool ok_size(const size_t& a, const size_t& b){return (a==1u)||(a==b);}
-
-/*! \brief Check if a point is 'behind' a plane
-
-\param n the plane normal
-\param p a point in the plane
-\param x the point to check
-\returns whether `x` is on or behind the plane
-
-\note A vector from any point on a plane to a test point has a positive dot
-      product with the plane normal if the test point is 'outside' of the plane,
-      zero if the test point is on the plane, and negative if it is 'behind'
-      the plane.
-*/
-template<class T>
-bArray<bool>
-point_inside_plane(
-  const bArray<T>& n, const bArray<T>& p, const bArray<T>& x
-){
-  return dot(n, x-p).is(brille::cmp::le, 0.); // true if x is closer to the origin
-}
+////! Check whether two sizes are compatible for broadcasting
+//static inline bool ok_size(const size_t& a, const size_t& b){return (a==1u)||(a==b);}
+//
+///*! \brief Check if a point is 'behind' a plane
+//
+//\param n the plane normal
+//\param p a point in the plane
+//\param x the point to check
+//\returns whether `x` is on or behind the plane
+//
+//\note A vector from any point on a plane to a test point has a positive dot
+//      product with the plane normal if the test point is 'outside' of the plane,
+//      zero if the test point is on the plane, and negative if it is 'behind'
+//      the plane.
+//*/
+//template<class T>
+//bArray<bool>
+//point_inside_plane(
+//  const bArray<T>& n, const bArray<T>& p, const bArray<T>& x
+//){
+//  return dot(n, x-p).is(brille::cmp::le, 0.); // true if x is closer to the origin
+//}
 /*! \brief Check if a point is 'behind' a plane
 
 \param plane_a the first point defining the plane
@@ -168,123 +152,96 @@ template<class T>
     }
     return pip;
 }
-
-/*! \brief Find the intersection point of three planes, broadcasting over inputs
-
-\param      n_i the normal to the first plane
-\param      p_i a point on the first plane
-\param      n_j the normal to the second plane
-\param      p_j a point on the second plane
-\param      n_k the normal to the third plane
-\param      p_k a point on the third plane
-\param[out] at  the intersection point of the three planes is set within, if it exists
-\returns whether each intersection exists
-
-\note If more than one plane is provided in any of the n_x, p_x combinations
-      the intersection is found for all broadcast combinations of three planes.
-      To successfully broadcast all i, j, and k planes must be singular or the
-      same number. The output array will contain the intersection point for all
-      broadcast combinations.
-*/
-template<class T>
-std::vector<bool> intersection(
-  const bArray<T>& n_i, const bArray<T>& p_i,
-  const bArray<T>& n_j, const bArray<T>& p_j,
-  const bArray<T>& n_k, const bArray<T>& p_k,
-  bArray<T>& at
-){
-  using namespace brille;
-  ind_t num[6]{n_i.size(0), p_i.size(0), n_j.size(0), p_j.size(0), n_k.size(0), p_k.size(0)};
-  ind_t npt=0;
-  for (ind_t i : num) if (i>npt) npt=i;
-  for (ind_t i : num) if (!ok_size(i,npt))
-    throw std::runtime_error("All normals and points must be singular or equal sized");
-  // output storage to indicate if an intersection exists
-  std::vector<bool> out(npt, false);
-  // find the scaled intersection points
-  // cross, multiply, and dot scale-up singleton inputs
-  auto tmp = cross(n_j,n_k)*dot(p_i,n_i) + cross(n_k,n_i)*dot(p_j,n_j) + cross(n_i,n_j)*dot(p_k,n_k);
-  T detM, mat[9];
-  const T *ptr_i=n_i.ptr(0,0), *ptr_j=n_j.ptr(0,0), *ptr_k=n_k.ptr(0,0);
-  bool u_i{n_i.size(0) == npt}, u_j{n_j.size(0) == npt}, u_k{n_k.size(0) == npt};
-  for (ind_t a=0; a<npt; ++a){
-    if (u_i) ptr_i = n_i.ptr(a,0);
-    if (u_j) ptr_j = n_j.ptr(a,0);
-    if (u_k) ptr_k = n_k.ptr(a,0);
-    for (ind_t b=0; b<3; ++b){
-      mat[b  ] = ptr_i[b];
-      mat[b+3] = ptr_j[b];
-      mat[b+6] = ptr_k[b];
-    }
-    detM = utils::matrix_determinant(mat);
-    if (std::abs(detM) > 1e-10){
-      at.set(a, tmp.view(a)/detM);
-      out[a] = true;
-    }
-  }
-  return out;
-}
-/*! \brief Find the intersection point of three planes within a set of planes, broadcasting over inputs
-
-\param      n   the normals to the bounding plane(s)
-\param      p   a point on each of the bounding plane(s)
-\param      n_i the normal to the first plane
-\param      p_i a point on the first plane
-\param      n_j the normal to the second plane
-\param      p_j a point on the second plane
-\param      n_k the normal to the third plane
-\param      p_k a point on the third plane
-\param[out] at  the intersection point of the three planes is set within, if it exists
-\returns whether each intersection point exists and is inside of the bounding
-         plane(s).
-
-\note If more than one plane is provided in any of the n_x, p_x combinations
-      the intersection is found for all broadcast combinations of three planes.
-      To successfully broadcast all i, j, and k planes must be singular or the
-      same number. The output array will contain the intersection point for all
-      broadcast combinations.
-*/
-template<class T>
-std::vector<bool> intersection(
-  const bArray<T>& n,  const bArray<T>& p,
-  const bArray<T>& n_i, const bArray<T>& p_i,
-  const bArray<T>& n_j, const bArray<T>& p_j,
-  const bArray<T>& n_k, const bArray<T>& p_k,
-  bArray<T>& at){
-  std::vector<bool> ok = intersection(n_i, p_i, n_j, p_j, n_k, p_k, at);
-  for (ind_t i=0; i<ok.size(); ++i) if (ok[i]){
-    auto pip = point_inside_plane(n, p, at.view(i));
-    ok[i] = pip.all();
-  }
-  return ok;
-}
-/*! \brief Find the intersection point of three planes within a set of planes
-
-\param      n   the normals to the bounding plane(s)
-\param      p   a point on each of the bounding plane(s)
-\param      n_i the normal to the first plane
-\param      p_i a point on the first plane
-\param      n_j the normal to the second plane
-\param      p_j a point on the second plane
-\param      n_k the normal to the third plane
-\param      p_k a point on the third plane
-\returns the intersection point of the three planes if it exists and is inside
-         of the bounding plane(s), otherwise an empty Array2.
-*/
-template<class T>
-bArray<T>
-one_intersection(
-  const bArray<T>& n,  const bArray<T>& p,
-  const bArray<T>& n_i, const bArray<T>& p_i,
-  const bArray<T>& n_j, const bArray<T>& p_j,
-  const bArray<T>& n_k, const bArray<T>& p_k)
-{
-  bArray<T> at(1u,3u);
-  if (intersection(n,p,n_i,p_i,n_j,p_j,n_k,p_k,at)[0])
-    return at;
-  else
-    return bArray<T>();
-}
+//
+///*! \brief Find the intersection point of three planes, broadcasting over inputs
+//
+//\param      n_i the normal to the first plane
+//\param      p_i a point on the first plane
+//\param      n_j the normal to the second plane
+//\param      p_j a point on the second plane
+//\param      n_k the normal to the third plane
+//\param      p_k a point on the third plane
+//\param[out] at  the intersection point of the three planes is set within, if it exists
+//\returns whether each intersection exists
+//
+//\note If more than one plane is provided in any of the n_x, p_x combinations
+//      the intersection is found for all broadcast combinations of three planes.
+//      To successfully broadcast all i, j, and k planes must be singular or the
+//      same number. The output array will contain the intersection point for all
+//      broadcast combinations.
+//*/
+//template<class T>
+//std::vector<bool> intersection(
+//  const bArray<T>& n_i, const bArray<T>& p_i,
+//  const bArray<T>& n_j, const bArray<T>& p_j,
+//  const bArray<T>& n_k, const bArray<T>& p_k,
+//  bArray<T>& at
+//){
+//  using namespace brille;
+//  ind_t num[6]{n_i.size(0), p_i.size(0), n_j.size(0), p_j.size(0), n_k.size(0), p_k.size(0)};
+//  ind_t npt=0;
+//  for (ind_t i : num) if (i>npt) npt=i;
+//  for (ind_t i : num) if (!ok_size(i,npt))
+//    throw std::runtime_error("All normals and points must be singular or equal sized");
+//  // output storage to indicate if an intersection exists
+//  std::vector<bool> out(npt, false);
+//  // find the scaled intersection points
+//  // cross, multiply, and dot scale-up singleton inputs
+//  auto tmp = cross(n_j,n_k)*dot(p_i,n_i) + cross(n_k,n_i)*dot(p_j,n_j) + cross(n_i,n_j)*dot(p_k,n_k);
+//  T detM, mat[9];
+//  const T *ptr_i=n_i.ptr(0,0), *ptr_j=n_j.ptr(0,0), *ptr_k=n_k.ptr(0,0);
+//  bool u_i{n_i.size(0) == npt}, u_j{n_j.size(0) == npt}, u_k{n_k.size(0) == npt};
+//  for (ind_t a=0; a<npt; ++a){
+//    if (u_i) ptr_i = n_i.ptr(a,0);
+//    if (u_j) ptr_j = n_j.ptr(a,0);
+//    if (u_k) ptr_k = n_k.ptr(a,0);
+//    for (ind_t b=0; b<3; ++b){
+//      mat[b  ] = ptr_i[b];
+//      mat[b+3] = ptr_j[b];
+//      mat[b+6] = ptr_k[b];
+//    }
+//    detM = utils::matrix_determinant(mat);
+//    if (std::abs(detM) > 1e-10){
+//      at.set(a, tmp.view(a)/detM);
+//      out[a] = true;
+//    }
+//  }
+//  return out;
+//}
+///*! \brief Find the intersection point of three planes within a set of planes, broadcasting over inputs
+//
+//\param      n   the normals to the bounding plane(s)
+//\param      p   a point on each of the bounding plane(s)
+//\param      n_i the normal to the first plane
+//\param      p_i a point on the first plane
+//\param      n_j the normal to the second plane
+//\param      p_j a point on the second plane
+//\param      n_k the normal to the third plane
+//\param      p_k a point on the third plane
+//\param[out] at  the intersection point of the three planes is set within, if it exists
+//\returns whether each intersection point exists and is inside of the bounding
+//         plane(s).
+//
+//\note If more than one plane is provided in any of the n_x, p_x combinations
+//      the intersection is found for all broadcast combinations of three planes.
+//      To successfully broadcast all i, j, and k planes must be singular or the
+//      same number. The output array will contain the intersection point for all
+//      broadcast combinations.
+//*/
+//template<class T>
+//std::vector<bool> intersection(
+//  const bArray<T>& n,  const bArray<T>& p,
+//  const bArray<T>& n_i, const bArray<T>& p_i,
+//  const bArray<T>& n_j, const bArray<T>& p_j,
+//  const bArray<T>& n_k, const bArray<T>& p_k,
+//  bArray<T>& at){
+//  std::vector<bool> ok = intersection(n_i, p_i, n_j, p_j, n_k, p_k, at);
+//  for (ind_t i=0; i<ok.size(); ++i) if (ok[i]){
+//    auto pip = point_inside_plane(n, p, at.view(i));
+//    ok[i] = pip.all();
+//  }
+//  return ok;
+//}
 
 template<class I> std::vector<I> two_in_one_indexes(const std::vector<std::vector<I>> & one, const std::vector<I> & two){
   std::vector<I> indexes;
@@ -303,62 +260,17 @@ template<class I> std::vector<I> keep_to_cut_list(const std::vector<bool> & keep
   return two_in_one_indexes(faces, to_remove);
 }
 
-template<class T>
-std::tuple<bool, bArray<T>> new_one_intersection_helper(
-  const bArray<T>& n0, const bArray<T>& p0, const bArray<T>& n1, const bArray<T>& p1, const bArray<T>& n2, const bArray<T>& p2
-){
-  using namespace brille;
-  assert(n0.size(0) == 1 && p0.size(0) == 1 && n1.size(0) == 1 && p1.size(0) == 1 && n2.size(0) == 1 && p2.size(0) == 1);
-  bArray<T> at(1u, 3u, T(0));
-  // check whether the intersection exists first:
-  if (orient3d(at.ptr(0), n0.ptr(0), n1.ptr(0), n2.ptr(0)) == 0.)
-    return std::make_tuple(false, at);
-  at = cross(n1, n2) * dot(p0, n0) + cross(n2, n0) * dot(p1, n1) + cross(n0, n1) * dot(p2, n2);
-  T detM, mat[9];
-  for (ind_t b=0; b<3; ++b){
-    mat[b  ] = n0.val(0, b);
-    mat[b+3] = n1.val(0, b);
-    mat[b+6] = n2.val(0, b);
-  }
-  detM = utils::matrix_determinant(mat);
-  return std::make_tuple(true, at / detM);
-}
 
-/*! \brief Find the intersection point of a plane with two planes from an existant Polyhedron
+/*! \brief Find the common-edge vertex indices between two facets
 
-\param  poly   the existent Polyhedron
-\param  j_idx  the index of the first face of poly to use
-\param  k_idx  the index of the second face of poly to use
-\param  plane_a the first point defining the test plane
-\param  plane_b the second point defining the test plane
-\param  plane_c the third point defining the test plane
-\returns the intersection point of the three planes if it exists and is inside
-         of the bounding polyhedron, otherwise an empty Array2.
+\param  one the first facet vertex indexes
+\param  two the second facet vertex indexes
+\param  strict whether the two vertex indexes must be neighbours and in opposite order on the two facets
+\returns A tuple containing a success value and the two indexes; if there is no common edge the success value is false.
 */
-  template<class T, class I>
-  bArray<T>
-  new_one_intersection(const bArray<T>& v, const std::vector<std::vector<int>>& vpf,
-                       const bArray<T>& n, const bArray<T>& p, const I j, const I k,
-                       const bArray<T>& a, const bArray<T>& b, const bArray<T>& c
-                       )
-  {
-    auto [ok, at] = new_one_intersection_helper(three_point_normal(a, b, c), (a + b + c) / 3.0, n.view(j), p.view(j), n.view(k), p.view(k));
-    if (ok){
-      for (size_t i=0; i < vpf.size(); ++i){
-        // the algorithm in intersection(...) is not stable enough to trust orient3d fully
-        if (i == static_cast<size_t>(j) || i == static_cast<size_t>(k)) continue;
-        const auto & face{vpf[i]};
-        auto o3d = orient3d(v.ptr(face[0]), v.ptr(face[1]), v.ptr(face[2]), at.ptr(0));
-        ok &= o3d >= 0.;
-        if (!ok) break;
-      }
-    }
-    return ok ? at: bArray<T>();
-  }
-
   template<class I> std::tuple<bool, I, I> common_edge(const std::vector<I>& one, const std::vector<I>& two, const bool strict=false){
     bool ok{false};
-    I a, b;
+    I a{0}, b{0};
     if (strict) {
       for (size_t i=0; !ok && i < one.size(); ++i){
         a = one[i];
@@ -385,28 +297,39 @@ std::tuple<bool, bArray<T>> new_one_intersection_helper(
     return std::make_tuple(ok, a, b);
   }
 
+  /*! \brief Find the intersection of the edge between two facets and a plane defined by three points
+  \param v      the vertices of the facets
+  \param vpf    the vertex indices for each known facet
+  \param j      the first facet index (accesses vpf)
+  \param k      the second facet index (accesses vpf)
+  \param a      the first point on the plane
+  \param b      the second point on the plane
+  \param c      the third point on the plane
+  \param strict whether the facet vertex indices are sorted correctly
+  \returns A bArray containing the intersection point, or an empty bArray if there is no intersection
+  */
   template<class T, class I> bArray<T> edge_plane_intersection(
-    const bArray<T>& v, const std::vector<std::vector<int>>& vpf, const I j, const I k,
+    const bArray<T>& v, const std::vector<I>& one, const std::vector<I>& two,
     const bArray<T>& a, const bArray<T>& b, const bArray<T>& c, const bool strict=false)
   {
     // find the correct pair of vertices which form the edge:
-    auto [ok, vj, vk] = common_edge(vpf[j], vpf[k], strict);
+    auto [ok, j, k] = common_edge(one, two, strict);
     if (ok) {
       // check whether they're on opposite sides of the plane (a, b, c)
-      auto o3dj = orient3d(a.ptr(0), b.ptr(0), c.ptr(0), v.ptr(vj));
-      auto o3dk = orient3d(a.ptr(0), b.ptr(0), c.ptr(0), v.ptr(vk));
+      auto o3dj = orient3d(a.ptr(0), b.ptr(0), c.ptr(0), v.ptr(j));
+      auto o3dk = orient3d(a.ptr(0), b.ptr(0), c.ptr(0), v.ptr(k));
       // both on one side, both on the other side, or both *in* the plane all preclude a single intersection
       if ((o3dj < 0 && o3dk < 0) || (o3dj > 0 && o3dk > 0) || (o3dj ==0 && o3dk ==0)) ok = false;
     }
     bArray<T> at;
     if (ok) {
       auto plane_n = three_point_normal(a, b, c);
-      auto line_u = v.view(vk) - v.view(vj);
+      auto line_u = v.view(k) - v.view(j);
       auto denominator = dot(plane_n, line_u);
-      auto numerator = dot(plane_n, a - v.view(vj));
+      auto numerator = dot(plane_n, a - v.view(j));
       assert(denominator.abs().sum() > 0);
       auto scalar = (numerator / denominator).sum();
-      at = v.view(vj) + scalar * line_u;
+      at = v.view(j) + scalar * line_u;
       debug_update_if(orient3d(a.ptr(0), b.ptr(0), c.ptr(0), at.ptr(0)) != 0.,
                       "The found intersection point ", at.to_string(0),
                       " is off the plane, proportional to ", orient3d(a.ptr(0), b.ptr(0), c.ptr(0), at.ptr(0)));
@@ -473,70 +396,44 @@ public:
   vertices(v) {
 //        FIXME
     this->keep_unique_vertices();
-    auto fpv = this->find_all_faces_per_vertex(p, p);
+    auto fpv = this->suboptimal_find_all_faces_per_vertex(p, p);
     bArray<double> n(p), pp;
-    std::tie(n, pp, fpv) = this->polygon_vertices_per_face(n, p, fpv);
+    std::tie(n, pp, fpv) = this->suboptimal_polygon_vertices_per_face(n, p, fpv);
     // this->sort_polygons();
     this->purge_central_polygon_vertices();
     this->sort_polygons();
     this->purge_extra_vertices(p);
   }
-//  //! initialize from vertices, points, and all relational information
-//  Polyhedron(const bArray<double>& v,
-//             const bArray<double>& p,
-//             std::vector<std::vector<int>> fpv,
-//             std::vector<std::vector<int>> vpf):
-//    vertices(v), vertices_per_face(std::move(vpf)){
-//        // FIXME
-//    this->sort_polygons();
-//  }
-  // initalize from vertices, points, normals, and three-plane intersection information
+
   //! Build a Polyhedron from vertices, on-face points, and face normals
-  Polyhedron(const bArray<double>& v,
-             const bArray<double>& p,
-             const bArray<double>& n):
-  vertices(v){
-//        FIXME
+  Polyhedron(const bArray<double>& v, const bArray<double>& p, const bArray<double>& n): vertices(v){
     verbose_update("Construct a polyhedron from vertices:\n",vertices.to_string());
     verbose_update("and planes (points, normals):\n", cat(1,p,n).to_string());
     this->keep_unique_vertices();
-    auto fpv = this->find_all_faces_per_vertex(n, p);
+    auto fpv = this->suboptimal_find_all_faces_per_vertex(n, p);
     bArray<double> nn, pp;
-    std::tie(nn, pp, fpv) = this->polygon_vertices_per_face(n, p, fpv);
+    std::tie(nn, pp, fpv) = this->suboptimal_polygon_vertices_per_face(n, p, fpv);
     // this->sort_polygons();
     this->purge_central_polygon_vertices();
     this->sort_polygons();
     this->purge_extra_vertices(n);
   }
-//  //! initialize from vertices, points, normals, and all relational information
-//  Polyhedron(const bArray<double>& v,
-//             const bArray<double>& p,
-//             const bArray<double>& n,
-//             std::vector<std::vector<int>> fpv,
-//             std::vector<std::vector<int>> vpf):
-//    vertices(v), vertices_per_face(std::move(vpf)){
-//        // FIXME
-//      this->special_keep_unique_vertices(); // for + below, which doesn't check for vertex uniqueness
-//  }
-  //! initialize from vertices, and vertices_per_face
+
+  //! initialize from vertices, and vertices_per_face (which must be correct)
   Polyhedron(const bArray<double>& v, std::vector<std::vector<int>> vpf): vertices(v), vertices_per_face(std::move(vpf)) {
     this -> keep_unique_vertices();
-    auto [n, p] = this->find_face_points_and_normals();
+//    auto [n, p] = this->find_face_points_and_normals();
     this->sort_polygons();
-    auto fpv = this->find_all_faces_per_vertex(n, p); // do we really need this?
+    auto fpv = this->find_all_faces_per_vertex(get_facet_triplets()); // do we really need this?
     verbose_update("Finished constructing Polyhedron with vertices\n",vertices.to_string(), "faces\n", vertices_per_face);
   }
   //! initialize from vertices, point, normals, and vertices_per_face (which needs sorting)
-  Polyhedron(
-          const bArray<double>& v,
-          const bArray<double>& p,
-          const bArray<double>& n,
-          std::vector<std::vector<int>> vpf
-          ):
+//  Polyhedron(const bArray<double>& v,const bArray<double>& p,const bArray<double>& n,std::vector<std::vector<int>> vpf):
+  Polyhedron(const bArray<double>& v,const bArray<double>& n,std::vector<std::vector<int>> vpf):
           vertices(v), vertices_per_face(std::move(vpf)){
-      this->verify_vertices_per_face(n);
+      this->verify_vertices_per_face(n); // verifies the vertices_per_face is correct
       this->sort_polygons();
-      auto fpv = this->find_all_faces_per_vertex(n, p);
+      auto fpv = this->find_all_faces_per_vertex(get_facet_triplets());
       verbose_update("Finished constructing Polyhedron with vertices\n",vertices.to_string(),
                      "(points, normals)\n",cat(1, p, n).to_string(),
                      "faces\n", vertices_per_face);
@@ -636,21 +533,20 @@ public:
   }
   //! Return the facets per vertex
   [[nodiscard]] std::vector<std::vector<int>> get_faces_per_vertex() const {
-    std::vector<std::vector<int>> fpv;
-    for (ind_t i=0; i < this->num_vertices(); ++i){
-        std::vector<int> tmp;
-        for (size_t j=0; j < this->vertices_per_face.size(); ++j){
-            const auto & face{this->vertices_per_face[j]};
-            if (std::find(face.begin(), face.end(), i) != face.end()){
-                tmp.push_back(static_cast<int>(j));
-            }
-        }
-        fpv.push_back(tmp);
-    }
-    return fpv;
+    return brille::utils::invert_lists(vertices_per_face);
   }
   //! Return the vertices per facet
   [[nodiscard]] std::vector<std::vector<int>> get_vertices_per_face() const {return vertices_per_face; }
+  //! Return the facet indices required to define each plane
+  [[nodiscard]] bArray<ind_t> get_facet_triplets() const {
+    bArray<ind_t> triplets(vertices_per_face.size(), 3u);
+    for (ind_t i=0; i<triplets.size(0); ++i){
+      for (ind_t j=0; j<3u; ++j){
+        triplets[{i, j}] = vertices_per_face[i][j];
+      }
+    }
+    return triplets;
+  }
   //! Return the facet polygons middle-edge points
   [[nodiscard]] bArray<double> get_half_edges() const{
     // for each face find the point halfway between each set of neighbouring vertices
@@ -778,51 +674,7 @@ protected:
       this->vertices = this->vertices.extract(flg);
     }
   }
-//  std::tuple<bArray<double>, bArray<double>> find_convex_hull(){
-//    /* Find the set of planes which contain all vertices.
-//       The cross product between two vectors connecting three points defines a
-//       plane normal. If the plane passing through the three points partitions
-//       space into point-free and not-point-free then it is one of the planes of
-//       the convex-hull.                                                       */
-//    debug_update_if(vertices.size(0)<3, "find_convex_hull:: Not enough vertices for brille::utils::binomial_coefficient");
-//    unsigned long long bc = brille::utils::binomial_coefficient(vertices.size(0), 3u);
-//    if (bc > static_cast<unsigned long long>(std::numeric_limits<brille::ind_t>::max()))
-//      throw std::runtime_error("Too many vertices to count all possible normals with a `size_t` integer");
-//    bArray<double> n(static_cast<brille::ind_t>(bc), 3u);
-//    bArray<double> p(static_cast<brille::ind_t>(bc), 3u);
-//    bArray<double> ab(2u, 3u);
-//    ind_t count = 0;
-//    // The same algorithm without temporary nijk, vi, vj, vk arrays (utilizing
-//    // vertices.extract, p.extract, and n.extract instead) does not work.
-//    // Either the compiler optimizes something important away or there is a bug
-//    // in repeatedly extracting the same array from an Array. In either
-//    // case, vectors which should not have been zero ended up as such.
-//    for (ind_t i=0; i<vertices.size(0)-2; ++i){
-//      auto vi = vertices.view(i);
-//      for (ind_t j=i+1; j<vertices.size(0)-1; ++j){
-//        auto vji = vertices.view(j) - vi;
-//        for (ind_t k=j+1; k<vertices.size(0); ++k){
-//          auto vki = vertices.view(k) - vi;
-//          auto nijk = cross(vji, vki);
-//          // increment the counter only if the new normal is not ⃗0 and partitions space
-//          if (!brille::approx::scalar(nijk.norm(0),0.) && dot(nijk, vertices-vi).all(brille::cmp::le_ge, 0.)){
-//            // verify that the normal points the right way:
-//            if (dot(nijk, vertices-vi).all(brille::cmp::ge,0.)) nijk = -1*nijk;
-//            // normalize the cross product to ensure we can determine uniqueness later
-//            n.set(count, nijk/nijk.norm(0));
-//            p.set(count, vi+(vji+vki)/3.0); // the average of (vi+vj+vk)
-//            ++count;
-//          }
-//        }
-//      }
-//    }
-//    if (n.size(0) < count)
-//      throw std::logic_error("Too many normal vectors found");
-//    // check that we only keep one copy of each unique normal vector
-//    n.resize(count); p.resize(count);
-//    auto nok = n.is_unique();
-//    return std::make_tuple(n.extract(nok), p.extract(nok));
-//  }
+
   bArray<ind_t> find_convex_hull(){
     /* Find the set of planes which contain all vertices.
        The cross product between two vectors connecting three points defines a
@@ -871,8 +723,9 @@ protected:
   // This is the function which is bad for non-convex polyhedra, since it
   // assigns all faces with n⋅(v-p)=0 to a vertex irrespective of whether two
   // faces have opposite direction normals.
-  [[deprecated("Switch to using three-point plane definitions")]]
-  std::vector<std::vector<int>> find_all_faces_per_vertex(const bArray<double>& normals, const bArray<double>& points){
+  // We can not (easlily) get rid of this due to the need to build polyhedra from a set of vertices and planes
+  // known only as direction and offset
+  std::vector<std::vector<int>> suboptimal_find_all_faces_per_vertex(const bArray<double>& normals, const bArray<double>& points){
     std::vector<std::vector<int>> fpv;
     for (ind_t i=0; i<vertices.size(0); ++i){
       std::vector<ind_t> onplane = dot(normals, vertices.view(i)-points).find(brille::cmp::eq,0.0);
@@ -904,19 +757,9 @@ protected:
     return fpv;
   }
 
-  [[deprecated("Switch to using three-point plane definitions")]]
   std::tuple<bArray<double>, bArray<double>, std::vector<std::vector<int>>>
-  polygon_vertices_per_face(const bArray<double>& normals, const bArray<double>& points, std::vector<std::vector<int>>& faces_per_vertex) {
-    bool flag;
-    // We have 3+ faces per vertex, so we can now find the vertices per face
-    std::vector<std::vector<int>> vpf(points.size(0));
-    for (size_t i=0; i<vertices.size(0); ++i){
-      for (auto facet: faces_per_vertex[i]){
-        flag = true;
-        for (auto vertex: vpf[facet]) if (static_cast<size_t>(vertex)==i) flag = false;
-        if (flag) vpf[facet].push_back(static_cast<int>(i));
-      }
-    }
+  suboptimal_polygon_vertices_per_face(const bArray<double>& normals, const bArray<double>& points, std::vector<std::vector<int>>& faces_per_vertex) {
+    auto vpf = brille::utils::invert_lists(faces_per_vertex);
     verbose_update("Found vertices per face array\n", vpf);
     verbose_update("Compared to utils::invert_list -> ", brille::utils::invert_lists(faces_per_vertex));
     // additionally, we only want to keep faces which describe polygons
@@ -955,8 +798,8 @@ protected:
   }
 
   std::tuple<bArray<ind_t>, std::vector<std::vector<int>>>
-  polygon_vertices_per_face(const bArray<ind_t>& triplets, std::vector<std::vector<int>>& faces_per_vertex) {
-    auto vpf = brille::utils::invert_lists(faces_per_vertex);
+  polygon_vertices_per_face(const bArray<ind_t>& triplets, std::vector<std::vector<int>>& fpv) {
+    auto vpf = brille::utils::invert_lists(fpv);
     verbose_update("Found vertices per face array\n", vpf);
     // additionally, we only want to keep faces which describe polygons
     std::vector<bool> is_polygon(vpf.size(), true);
@@ -964,16 +807,14 @@ protected:
       is_polygon[i] = face_has_area(vertices.extract(vpf[i]));
     verbose_update("Face is polygon:",is_polygon);
 
-
-
-    // we should modify faces_per_vertex here, to ensure its indexing is correct
+    // we should modify fpv here, to ensure its indexing is correct
     size_t count = 0, max=vpf.size(); std::vector<size_t> map;
     for (size_t i=0; i<max; ++i) map.push_back(is_polygon[i] ? count++ : max);
-    std::vector<std::vector<int>> reduced_fpv(faces_per_vertex.size());
-    for (size_t i=0; i<faces_per_vertex.size(); ++i)
-      for (auto facet: faces_per_vertex[i]) if (is_polygon[facet])
+    std::vector<std::vector<int>> reduced_fpv(fpv.size());
+    for (size_t i=0; i < fpv.size(); ++i)
+      for (auto facet: fpv[i]) if (is_polygon[facet])
           reduced_fpv[i].push_back(static_cast<int>(map[facet]));
-    verbose_update("Faces per vertex reduced to\n", faces_per_vertex);
+    verbose_update("Faces per vertex reduced to\n", fpv);
 
     // plus cut-down the vertices_per_face vector
     std::vector<std::vector<int>> polygon_vpf;
@@ -1216,9 +1057,6 @@ public:
     return divided.translate(centroid);
   }
 
-
-
-
   /*! Find the polyhedron which results from slicing an existant polyhedron by
   one or more plane passing through its volume. The part closest to the origin
   is retained.*/
@@ -1232,8 +1070,6 @@ public:
     // copy the current vertices, normals, and relational information
     auto pv  = pout.get_vertices();
     auto pn  = pout.get_normals();
-    auto pp  = pout.get_points();
-    auto fpv = pout.get_faces_per_vertex(); // I think this is useless.
     auto vpf = pout.get_vertices_per_face();
     // move the output polyhedron to be centred on the origin -- which requires we move all cutting planes as well
     // auto origin = sum(pv)/static_cast<double>(pv.size(0));
@@ -1248,19 +1084,18 @@ public:
       auto keep = point_inside_plane(a_i, b_i, c_i, pv);
       if (std::find(keep.begin(), keep.end(), false)!=keep.end()){
         verbose_update("Pre-cut ",i," polyhedron vertices:\n",pv.to_string());
-        verbose_update("Pre-cut ",i," polyhedron planes (p,n):\n",cat(1,pn,pp).to_string());
-        verbose_update("Pre-cut ",i," polyhedron faces_per_vertex:\n", fpv);
+        verbose_update("Pre-cut ",i," polyhedron plane normals:\n",pn.to_string());
         verbose_update("Pre-cut ",i," polyhedron vertices_per_face:\n",vpf);
         // compile the list of facets which need to be cut or removed
         auto cut = keep_to_cut_list(keep, vpf);
         verbose_update("Facets ",cut," are cut by the plane");
         // find the new intersection points of two neighbouring facets and the cutting plane
         std::vector<int> new_vector;
-        int last_face = static_cast<int>(pn.size(0)); // the to-be-index of the new facet (normal)
+//        int last_face = static_cast<int>(pn.size(0)); // the to-be-index of the new facet (normal)
         unsigned new_face_vertex_count{0}, new_vertex_count{0};
         for (size_t j=0; j<cut.size()-1; ++j){ for (size_t k=j+1; k<cut.size(); ++k){
           // check if the facets-edge and plane intersect
-          auto at = edge_plane_intersection(pv, vpf, cut[j], cut[k], a_i, b_i, c_i);
+          auto at = edge_plane_intersection(pv, vpf[cut[j]], vpf[cut[k]], a_i, b_i, c_i);
           if ( at.size(0) == 1 ){ // there is a single intersection
             int lv;
             verbose_update("Cut facets ", cut[j]," and ", cut[k]);
@@ -1269,8 +1104,6 @@ public:
               lv = static_cast<int>(pv.size(0));
               verbose_update("Add intersection at point ",at.to_string(0));
               pv.append(0, at);
-              // plus add the face index to the faces_per_vertex list for this new vertex
-              fpv.push_back({cut[j], cut[k], last_face});
               // track how many new vertices we add
               ++new_vertex_count;
             } else {
@@ -1278,16 +1111,14 @@ public:
               lv = static_cast<int>(norm(pv-at).first(brille::cmp::eq,0.));
               auto dif = (pv.view(lv) - at).abs().sum();
               if (dif > 0.) {
+                // this is here since orient3d is more accurate than brille::approx in most (all?) cases
                 lv = static_cast<int>(pv.size(0));
                 verbose_update("Add intersection at ",at.to_string(0), " since existing point has difference ",dif);
                 pv.append(0, at);
-                fpv.push_back({cut[j], cut[k], last_face});
                 ++new_vertex_count;
               } else {
                 verbose_update("Reusing existing intersection point ",pv.to_string(lv)," for found intersection ",at.to_string(0));
-//                info_update_if(dif > 0., "Approximate point match! This may lead to rounding errors");
-//                // Make sure that this point is retained, even if it should have been removed ...
-                keep[lv] = true;
+                keep[lv] = true; // just in case
               }
             }
             // add the new vertex to the list for each existing facet -- if it's not already present
@@ -1301,9 +1132,8 @@ public:
         }} // end of loops j and k
         debug_update_if(new_vector.size()!=new_face_vertex_count, "New vertices is wrong size!");
         if (!new_vector.empty()){
-          // add the normal and point for the new face
+          // add the normal for the new face
           pn.append(0,three_point_normal(a_i, b_i, c_i));
-          pp.append(0,(a_i + b_i + c_i) / 3.0);
           // extend the vertices per face vector
           vpf.push_back(new_vector);
         }
@@ -1335,28 +1165,17 @@ public:
           }
           face = nnv;
         }
-        pv = new_pv; // done with normals so we can switch to the reduced vertices
+        pv = new_pv; // done with normals, so we can switch to the reduced vertices
         verbose_update("gets reduced to:\n", vpf);
-
-
-        // we need to calculate the face centres, but only for true faces (more than 2 vertices)
-        for (ind_t j=0; j<vpf.size(); ++j) if(vpf[j].size()>2) {
-          auto cen = pv.extract(vpf[j]);
-          // store the centroid as the on-plane point
-          // We need to be extra careful whenever we use Array.set since we may be sharing data with other Array(s)!!!
-          pp = pp.decouple(); // decouple only copies memory if it is shared
-          // if (cen.size(0)) // this check isn't necessary since vpf[j].size()!=0
-          pp.set(j, cen.sum(0)/static_cast<double>(cen.size(0)) );
-        }
 
         // remove any faces without three vertices
         std::vector<bool> has3v;
-        for (size_t j=0; j<pp.size(0); ++j) has3v.push_back(unique(vpf[j]).size()>2);
+        has3v.reserve(vpf.size());
+        for (const auto & j : vpf) has3v.push_back(unique(j).size()>2);
         verbose_update("Keep faces with 3+ vertices: ", has3v);
-        pp = pp.extract(has3v);
         pn = pn.extract(has3v);
         // and remove their empty vertex lists
-        vpf.erase(std::remove_if(vpf.begin(), vpf.end(), [](std::vector<int> i){return unique(i).size()<3;}), vpf.end());
+        vpf.erase(std::remove_if(vpf.begin(), vpf.end(), [](const std::vector<int> & i){return unique(i).size()<3;}), vpf.end());
         verbose_update("So that vertices per face becomes\n", vpf);
 
         // remove any faces that are not connected on all sides
@@ -1370,7 +1189,7 @@ public:
                       adjacent_face_no[j]++;
           }
           // for each face now check if all vertices are adjacent to 3+ faces
-          // storing the result for reducing pp & pn
+          // storing the result for reducing pn
           auto check = [adjacent_face_no](const std::vector<int> & face) -> bool {return !is_not_dangling(adjacent_face_no, face);};
           std::vector<bool> not_ok;
           std::transform(vpf.begin(), vpf.end(), std::back_inserter(not_ok), check);
@@ -1381,7 +1200,6 @@ public:
           verbose_update_if(check_again, "Vertices per face now\n", vpf);
           if (check_again){
             std::transform(not_ok.begin(), not_ok.end(), not_ok.begin(), [](const auto & b){return !b;});
-            pp = pp.extract(not_ok);
             pn = pn.extract(not_ok);
           }
         }
@@ -1402,20 +1220,17 @@ public:
           pv = pv.extract(kv);
           verbose_update("Resulting in \n", pv.to_string());
         }
-        // with less than four points, normals, or vertices it can't be a Polyhedron
-	      if (pv.size(0)<4 || pp.size(0)<4 || pn.size(0)<4){
+        // with less than four normals, or vertices it can't be a Polyhedron
+        if (pv.size(0)<4 || pn.size(0)<4){
           verbose_update("Null intersection since we have ",pv.size(0)," points ", pp.size(0), " planes");
           return Polyhedron();
         }
-        // use the Polyhedron intializer to sort out fpv -- vpf should be correct
         // THIS USES STD::MOVE ON VPF!
-        pout = Polyhedron(pv, pp, pn, vpf);
+        pout = Polyhedron(pv, pn, vpf);
         verbose_update("New ",pout.string_repr());
         // copy the updated vertices, normals, and relational information
         pv=pout.get_vertices();
         pn=pout.get_normals();
-        pp=pout.get_points();
-        fpv = pout.get_faces_per_vertex();
         vpf = pout.get_vertices_per_face();
       }
     }
@@ -1448,9 +1263,6 @@ public:
     auto group = overwrite_group(obj, entry);
     bool ok{true};
     ok &= vertices.to_hdf(group, "vertices");
-    ok &= points.to_hdf(group, "points");
-    ok &= normals.to_hdf(group, "normals");
-    ok &= lists_to_hdf(faces_per_vertex, group, "faces_per_vertex");
     ok &= lists_to_hdf(vertices_per_face, group, "vertices_per_face");
     return ok;
   }
@@ -1462,11 +1274,8 @@ public:
   from_hdf(HF& obj, const std::string& entry){
     auto group = obj.getGroup(entry);
     auto v = bArray<double>::from_hdf(group, "vertices");
-    auto p = bArray<double>::from_hdf(group, "points");
-    auto n = bArray<double>::from_hdf(group, "normals");
-    auto fpv = lists_from_hdf<int>(group, "faces_per_vertex");
     auto vpf = lists_from_hdf<int>(group, "vertices_per_face");
-    return {v, p, n, fpv, vpf};
+    return {v, vpf};
   }
   static Polyhedron from_hdf(const std::string& filename, const std::string& dataset){
     HighFive::File file(filename, HighFive::File::ReadOnly);
