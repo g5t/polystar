@@ -1,6 +1,6 @@
-/* This file is part of brille.
+/* This file is part of brille
 
-Copyright © 2020 Greg Tucker <greg.tucker@stfc.ac.uk>
+Copyright © 2020-2022 Greg Tucker <gregory.tucker@ess.eu>
 
 brille is free software: you can redistribute it and/or modify it under the
 terms of the GNU Affero General Public License as published by the Free
@@ -14,6 +14,7 @@ See the GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with brille. If not, see <https://www.gnu.org/licenses/>.            */
+
 /*! \file
     \author Greg Tucker
     \brief Two dimensional shared memory Array2 class definition.

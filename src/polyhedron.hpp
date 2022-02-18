@@ -1,22 +1,22 @@
-/* This file is part of polystar
+/* This file is part of brille
 
-Copyright © 2022 Greg Tucker <greg.tucker@ess.eu>
+Copyright © 2019-2022 Greg Tucker <gregory.tucker@ess.eu>
 
-polystar is free software: you can redistribute it and/or modify it under the
+brille is free software: you can redistribute it and/or modify it under the
 terms of the GNU Affero General Public License as published by the Free
 Software Foundation, either version 3 of the License, or (at your option)
 any later version.
 
-polystar is distributed in the hope that it will be useful, but
+brille is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
 or FITNESS FOR A PARTICULAR PURPOSE.
 See the GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with polystar. If not, see <https://www.gnu.org/licenses/>.            */
+along with brille. If not, see <https://www.gnu.org/licenses/>.            */
 
-#ifndef POLYSTAR_POLYHEDRON_H_
-#define POLYSTAR_POLYHEDRON_H_
+#ifndef BRILLE_POLYHEDRON_H_
+#define BRILLE_POLYHEDRON_H_
 /*! \file
     \author Greg Tucker
     \brief A class representing convex polyhedra in three dimensions
