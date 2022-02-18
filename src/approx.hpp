@@ -75,15 +75,15 @@ namespace brille{
     -# `boolean`, true if `T` is a floating point datatype
     -# `Trel`, proportional to epsilon of the datatype `T`
     -# `Rrel`, proportional to epsilon of the datatype `R`.
-    -# `Tabs`, a small value `T(5e-9)`
-    -# `Rabs`, a small value `R(5e-9)`
+    -# `Tabs`, a small value `T(5e-12)`
+    -# `Rabs`, a small value `R(5e-12)`
     */
     template<class T, class R>
     std::tuple<bool,bool,T,R,T,R> tols(const int tol=1){
       T Trel = std::numeric_limits<T>::epsilon(); // zero for integer-type T
       R Rrel = std::numeric_limits<R>::epsilon(); // zero for integer-type R
-      T Tabs = T(5)/1000000000; // 0 or 5e-9
-      R Rabs = R(5)/1000000000; // 0 or 5e-9
+      T Tabs = T(5)/1000000000000; // 0 or 5e-12
+      R Rabs = R(5)/1000000000000; // 0 or 5e-12
       bool TorRisInteger = Trel*Rrel==0 || std::is_convertible<T,R>::value;
       bool TisFloatingPt = Trel > 0;
       Trel *= static_cast<T>(tol)*static_cast<T>(TOL_MULT);

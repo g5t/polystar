@@ -639,6 +639,55 @@ template<typename S,typename U> S u2s(const U u);
 //! Convert signed integers to unsigned integers
 template<typename U,typename S> U s2u(const S s);
 
+
+template<class T>
+bool add_if_missing(std::vector<T>& vector, const T value) {
+  if (std::find(vector.begin(), vector.end(), value) == vector.end()){
+    vector.push_back(value);
+    return true;
+  }
+  return false;
+}
+
+template<class I>
+std::tuple<bool, I> all_present(const std::vector<std::vector<I>> & lists) {
+  I maximum{0};
+  for (const auto &list: lists) for (const auto &value: list) if (value > maximum) maximum = value;
+  for (I index = 0; index < maximum + 1; ++index) {
+    bool found{false};
+    for (const auto &list: lists) {
+      for (const auto &value: list) {
+        if (value == index) {
+          found = true;
+          break;
+        }
+      }
+    }
+    if (!found) return std::make_tuple(false, maximum);
+  }
+  return std::make_tuple(true, maximum);
+}
+
+template<class I>
+std::vector<std::vector<I>> invert_lists(const std::vector<std::vector<I>> & lists){
+  auto [ok, maximum] = all_present(lists);
+  assert(ok);
+  std::vector<std::vector<I>> inverted;
+  inverted.reserve(maximum);
+  for (I index=0; index < maximum + 1; ++index){
+    std::vector<I> one;
+    one.reserve(lists.size());
+    for (size_t list_index=0; list_index < lists.size(); ++list_index){
+      const auto & list{lists[list_index]};
+      if (std::find(list.begin(), list.end(), index) != list.end()){
+        one.push_back(static_cast<I>(list_index));
+      }
+    }
+    inverted.push_back(one);
+  }
+  return inverted;
+}
+
 #include "utilities.tpp"
 
   } // namespace utils

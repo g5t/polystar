@@ -1044,6 +1044,13 @@ Array2<T> Array2<T>::contiguous_row_ordered_copy() const {
 }
 
 template<class T>
+Array2<T> Array2<T>::abs() const {
+  Array2<T> out(_shape, this->calculate_stride(_shape));
+  for (auto x: this->subItr()) out[x] = std::abs((*this)[x]);
+  return out;
+}
+
+template<class T>
 static void mutable_check(const Array2<T>& a){
   if (!a.ismutable())
   throw std::runtime_error("Immutable Array2 objects can not be modified!");

@@ -301,7 +301,7 @@ private:
     //   }
     // } else {
       for (auto y: x){
-        s += " " + my_to_string(y, l);
+        s += " " + my_to_string(y, l) + ",";
         if (!(++count % w)) s += "\n" + this->lead_in();
       }
     // }
@@ -322,7 +322,7 @@ private:
       if (l) w /= l+1;
       size_t count = 0;
       for (size_t i=0; i<N; ++i){
-        s += " " + my_to_string(x[i], l);
+        s += " " + my_to_string(x[i], l) + ",";
         if (!(++count % w)) s += "\n" + this->lead_in();
       }
     // }
@@ -336,14 +336,22 @@ private:
     size_t num;
     std::string s;
     if (l) w /= l+1;
-    for (auto v: vv){
+    s += "[";
+    ++_before;
+    for (size_t i=0; i < vv.size(); ++i){
+      const auto & v{vv[i]};
       num = 0;
-      for (auto x: v){
-        s += my_to_string(x, l);
+      s += "[";
+      for (size_t j=0; j < v.size(); ++j){
+        s += my_to_string(v[j], l);
+        if (j + 1 < v.size()) s += ',';
         if (!(++num %w)) s += "\n" + this->lead_in();
       }
+      s += "]";
+      s += (i + 1 < vv.size()) ? "," : "]";
       s += "\n" + this->lead_in();
     }
+    --_before;
     this->inner_print(s, args...);
   }
   template<typename T, size_t N, typename... L>
@@ -369,7 +377,7 @@ private:
       if (l) w /= l+1;
       for (size_t i=0; i<x.size(); num=0, ++i){
         for (auto y: x[i]){
-          s += my_to_string(y, l);
+          s += my_to_string(y, l) + ",";
           if (!(++num % w)) s += "\n" + this->lead_in();
         }
         s += "\n" + this->lead_in();

@@ -18,10 +18,24 @@ static bool lists_match(const std::vector<std::vector<T>>& a, const std::vector<
   return true;
 }
 
+template<class T>
+static bool equivalent_permutations(const std::vector<T>& a, const std::vector<T>& b){
+    if (a.size() != b.size()) return false;
+    for (size_t roll=0; roll < a.size(); ++roll){
+        bool ok{true};
+        for (size_t i=0; i < a.size(); ++i) ok &= a[i] == b[(i + roll) % a.size()];
+        if (ok) return ok;
+    }
+    return false;
+}
+
 TEST_CASE("Polyhedron instantiation","[polyhedron]"){
   std::vector<std::array<double,3>> va_verts{{1,1,0},{2,0,0},{1,1,1},{0,0,0}};
   auto verts = bArray<double>::from_std(va_verts);
   std::vector<std::vector<int>> vpf{{0,1,3},{0,2,1},{0,3,2},{1,2,3}};
+  std::vector<std::array<double,3>> va_norms{{0,0,-1},{1,1,0},{-1,1,0},{0,-1,1}};
+  auto norms = bArray<double>::from_std(va_norms);
+  norms /= norm(norms);  // ensure the normal vectors have length unity
   Polyhedron poly;
   SECTION("Convex Hull creation"){
     poly = Polyhedron(verts);
@@ -29,15 +43,21 @@ TEST_CASE("Polyhedron instantiation","[polyhedron]"){
   SECTION("Vertices and Faces creation"){
     poly = Polyhedron(verts, vpf);
   }
+  // verify that the vertices are the same
+  auto pv = poly.get_vertices();
+  for (const auto & i: verts.subItr()){
+      REQUIRE(verts[i] == Approx(pv[i]));
+  }
   // verify that the anticipated faces were found:
   size_t num_faces_matching{0};
-  for (auto cf: poly.get_vertices_per_face()){
-    for (auto f: vpf){
-      if (cf.size()==f.size() &&
-         ((cf[0]==f[0] && cf[1]==f[1] && cf[2]==f[2]) ||
-          (cf[0]==f[1] && cf[1]==f[2] && cf[2]==f[0]) ||
-          (cf[0]==f[2] && cf[1]==f[0] && cf[2]==f[1])   )
-       ) ++num_faces_matching;
+  auto pvpf = poly.get_vertices_per_face();
+  auto pn = poly.get_normals();
+  for (size_t i=0; i < pvpf.size(); ++i){
+    for (size_t j=0; j < vpf.size(); ++j){
+      if (equivalent_permutations(pvpf[i], vpf[j])){
+        ++num_faces_matching;
+        REQUIRE(pn.view(i) == norms.view(j));
+      }
     }
   }
   REQUIRE( num_faces_matching == vpf.size() );
@@ -52,6 +72,7 @@ TEST_CASE("Polyhedron intersection","[polyhedron]"){
   double x = 0.143963;
   std::array<double,3> boxmin{2*x,0,0}, boxmax{3*x,x,x};
   Polyhedron box = polyhedron_box(boxmin,boxmax);
+  REQUIRE(box.get_volume() == Approx(x*x*x));
   Polyhedron poly_box = poly.intersection(box);
   Polyhedron box_poly = box.intersection(poly);
   REQUIRE(poly_box.get_volume() == Approx(box.get_volume()/2));
@@ -63,18 +84,22 @@ TEST_CASE("Polyhedron bisect","[polyhedron]"){
   std::vector<std::array<double,3>> v{{a,0,0},{0,0,c},{a,a,c},{a,0,c},{a,a,0},{0,0,0}};
   auto poly = Polyhedron(bArray<double>::from_std(v));
   auto doubled_poly = poly + poly.mirror();
-  bArray<double> n({1,3}, 0.), p({1,3}, 0.);
+  bArray<double> pa({1, 3}, 0.), pb({1, 3}, 0.), pc({1, 3}, 0.);
+  pa.val(0, 1) = 1.0;
   SECTION("Hanging line"){
-    n.val(0,0) = -1;
+    // n = (-1 0 0) --> (0, 1, 0), (0, 0, 0), (0, 0, 1)
+    pc.val(0, 2) = 1;
   }
   SECTION("Hanging triangular face"){
-    n.val(0,2) = -1;
+    // n = (0 0 -1) -> (0, 1, 0), (0, 0, 0), (-1, 0, 0)
+    pc.val(0, 0) = -1;
   }
   SECTION("Hanging rectangular face"){
-    n.val(0,0) = -1;
-    n.val(0,1) = 1;
+    // n = (-1, 1, 0) -> (1, 1, 0), (0, 0, 0), (0, 0, 1)
+    pa.val(0, 0) = 1;
+    pc.val(0, 2) = 1;
   }
-  auto cut = Polyhedron::bisect(doubled_poly, n, p);
+  auto cut = Polyhedron::bisect(doubled_poly, pa, pb, pc);
   REQUIRE(cut.get_volume() == Approx(poly.get_volume()));
   REQUIRE(cut.get_vertices().size(0) == 6u);
 }
@@ -84,7 +109,7 @@ TEST_CASE("Polyhedron random point distribution","[polyhedron]"){
   auto verts = bArray<double>::from_std(va_verts);
   Polyhedron poly(verts);
 
-  ind_t seed=10, npoints=1000;
+  ind_t seed=10, npoints=10;
   auto r0 = poly.rand_rejection(npoints, seed);
   // check that the generated points are inside the polyhedron
   auto in = poly.contains(r0);
@@ -130,7 +155,7 @@ TEST_CASE("Polyhedron intersection La2Zr2O7","[polyhedron][intersection]"){
   REQUIRE(cbp.get_vertices().size(0) == 10u);
 }
 
-TEST_CASE("Small face polyhedron convex hull","[!shouldfail][polyhedron][convexhull]"){
+TEST_CASE("Small face polyhedron convex hull","[polyhedron][convexhull]"){
   std::vector<std::array<double,3>> va_verts
   {{0.0846, 0.0217, 0.1775},
    {0.0846, 0.0652, 0.1775},
