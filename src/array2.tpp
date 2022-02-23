@@ -38,7 +38,11 @@ Array2<T> Array2<T>::view(const ind_t i, const ind_t j) const {
     osize[0] = j-i;
     return Array2<T>(_data, _num, oshft, _own, _ref, osize, _stride, false);
   }
-  throw std::runtime_error("Array2 view indexing error");
+  std::string msg{"Array2 view indexing error since"};
+  if (i>=j) msg += " " + std::to_string(i) + " is not less than " + std::to_string(j);
+  if (i >= _shape[0]) msg +=  " " + std::to_string(i) + " >= shape " + std::to_string(_shape[0]);
+  if (j > _shape[0]) msg +=  " " + std::to_string(j) + " > shape " + std::to_string(_shape[0]);
+  throw std::runtime_error(msg);
 }
 
 template<class T>
@@ -759,6 +763,143 @@ Array2<T>::row_is(const brille::cmp expr, const std::vector<R>& row) const{
 
 template<class T>
 template<class R>
+Array2<bool> Array2<T>::row_is(const brille::cmp expr, const Array2<R>& rows) const {
+  // To handle singleton-dimension broadcasting, this function needs to be split
+  auto r_shape = rows.shape();
+  if (!std::equal(_shape.begin(), _shape.end(), r_shape.begin(), [](ind_t a, ind_t b){return 1 == b || a == b;})){
+    std::string msg = "An Array2 with size ( ";
+    for (auto x: r_shape) msg += std::to_string(x) + " ";
+    msg += ") can not be broadcast to match one with size ( ";
+    for (auto x: _shape) msg += std::to_string(x) + " ";
+    msg += ").";
+    throw std::runtime_error(msg);
+  }
+  Array2<bool> out(_shape[0], true);
+  if (std::equal(_shape.begin(), _shape.end(), r_shape.begin())){
+    // No broadcast
+    brille::Comparer<T,R> op(expr);
+    auto r_stride = rows.stride();
+    for (ind_t i=0; i<_shape[0]; ++i)
+      out[i] = op(_shape[1], this->ptr(i), _stride[1], rows.ptr(i), r_stride[1]);
+  } else {
+    // Broadcast
+    for (ind_t i=1; i<_shape.size(); ++i) if (_shape[i] != r_shape[i])
+        throw std::runtime_error("Broadcasting beyond the first dimension requires viewing beyond the first dimension!");
+    for (ind_t i=0; i<_shape[0]; ++i)
+      out.set(i, this->view(i).row_is(expr, rows));
+  }
+  return out;
+}
+
+template<class T>
+template<class R>
+ind_t Array2<T>::first(const brille::cmp expr, const Array2<R>& rows) const {
+  // To handle singleton-dimension broadcasting, this function needs to be split
+  auto r_shape = rows.shape();
+  if (!std::equal(_shape.begin(), _shape.end(), r_shape.begin(), [](ind_t a, ind_t b){return 1 == b || a == b;})){
+    std::string msg = "An Array2 with size ( ";
+    for (auto x: r_shape) msg += std::to_string(x) + " ";
+    msg += ") can not be broadcast to match one with size ( ";
+    for (auto x: _shape) msg += std::to_string(x) + " ";
+    msg += ").";
+    throw std::runtime_error(msg);
+  }
+  if (std::equal(_shape.begin(), _shape.end(), r_shape.begin())){
+    // No broadcast
+    brille::Comparer<T,R> op(expr);
+    auto r_stride = rows.stride();
+    for (ind_t i=0; i<_shape[0]; ++i) if (op(_shape[1], this->ptr(i), _stride[1], rows.ptr(i), r_stride[1])) return i;
+  } else {
+    // Broadcast
+    for (ind_t i=1; i<_shape.size(); ++i) if (_shape[i] != r_shape[i])
+        throw std::runtime_error("Broadcasting beyond the first dimension requires viewing beyond the first dimension!");
+    for (ind_t i=0; i<_shape[0]; ++i) if (this->view(i).row_is(expr, rows).all()) return i;
+  }
+  return _shape[0];
+}
+template<class T>
+template<class R>
+ind_t Array2<T>::last(const brille::cmp expr, const Array2<R>& rows) const {
+  // To handle singleton-dimension broadcasting, this function needs to be split
+  auto r_shape = rows.shape();
+  if (!std::equal(_shape.begin(), _shape.end(), r_shape.begin(), [](ind_t a, ind_t b){return 1 == b || a == b;})){
+    std::string msg = "An Array2 with size ( ";
+    for (auto x: r_shape) msg += std::to_string(x) + " ";
+    msg += ") can not be broadcast to match one with size ( ";
+    for (auto x: _shape) msg += std::to_string(x) + " ";
+    msg += ").";
+    throw std::runtime_error(msg);
+  }
+  if (std::equal(_shape.begin(), _shape.end(), r_shape.begin())){
+    // No broadcast
+    brille::Comparer<T,R> op(expr);
+    auto r_stride = rows.stride();
+    for (ind_t i=_shape[0]; i--;) if (op(_shape[1], this->ptr(i), _stride[1], rows.ptr(i), r_stride[1])) return i;
+  } else {
+    // Broadcast
+    for (ind_t i=1; i<_shape.size(); ++i) if (_shape[i] != r_shape[i])
+        throw std::runtime_error("Broadcasting beyond the first dimension requires viewing beyond the first dimension!");
+    for (ind_t i=_shape[0]; i--;) if (this->view(i).row_is(expr, rows).all()) return i;
+  }
+  return _shape[0];
+}
+template<class T>
+template<class R>
+ind_t Array2<T>::count(const brille::cmp expr, const Array2<R>& rows) const {
+  // To handle singleton-dimension broadcasting, this function needs to be split
+  auto r_shape = rows.shape();
+  if (!std::equal(_shape.begin(), _shape.end(), r_shape.begin(), [](ind_t a, ind_t b){return 1 == b || a == b;})){
+    std::string msg = "An Array2 with size ( ";
+    for (auto x: r_shape) msg += std::to_string(x) + " ";
+    msg += ") can not be broadcast to match one with size ( ";
+    for (auto x: _shape) msg += std::to_string(x) + " ";
+    msg += ").";
+    throw std::runtime_error(msg);
+  }
+  ind_t number{0};
+  if (std::equal(_shape.begin(), _shape.end(), r_shape.begin())){
+    // No broadcast
+    brille::Comparer<T,R> op(expr);
+    auto r_stride = rows.stride();
+    for (ind_t i=0; i<_shape[0]; ++i) if (op(_shape[1], this->ptr(i), _stride[1], rows.ptr(i), r_stride[1])) ++number;
+  } else {
+    // Broadcast
+    for (ind_t i=1; i<_shape.size(); ++i) if (_shape[i] != r_shape[i])
+        throw std::runtime_error("Broadcasting beyond the first dimension requires viewing beyond the first dimension!");
+    for (ind_t i=0; i<_shape[0]; ++i) if (this->view(i).row_is(expr, rows).all()) ++number;
+  }
+  return number;
+}
+template<class T>
+template<class R>
+std::vector<ind_t> Array2<T>::find(const brille::cmp expr, const Array2<R>& rows) const {
+  // To handle singleton-dimension broadcasting, this function needs to be split
+  auto r_shape = rows.shape();
+  if (!std::equal(_shape.begin(), _shape.end(), r_shape.begin(), [](ind_t a, ind_t b){return 1 == b || a == b;})){
+    std::string msg = "An Array2 with size ( ";
+    for (auto x: r_shape) msg += std::to_string(x) + " ";
+    msg += ") can not be broadcast to match one with size ( ";
+    for (auto x: _shape) msg += std::to_string(x) + " ";
+    msg += ").";
+    throw std::runtime_error(msg);
+  }
+  std::vector<ind_t> out;
+  if (std::equal(_shape.begin(), _shape.end(), r_shape.begin())){
+    // No broadcast
+    brille::Comparer<T,R> op(expr);
+    auto r_stride = rows.stride();
+    for (ind_t i=0; i<_shape[0]; ++i) if (op(_shape[1], this->ptr(i), _stride[1], rows.ptr(i), r_stride[1])) out.push_back(i);
+  } else {
+    // Broadcast
+    for (ind_t i=1; i<_shape.size(); ++i) if (_shape[i] != r_shape[i])
+        throw std::runtime_error("Broadcasting beyond the first dimension requires viewing beyond the first dimension!");
+    for (ind_t i=0; i<_shape[0]; ++i) if (this->view(i).row_is(expr, rows).all()) out.push_back(i);
+  }
+  return out;
+}
+
+template<class T>
+template<class R>
 std::vector<bool>
 Array2<T>::each_is(const brille::cmp expr, const std::vector<R>& vals) const{
   auto no = this->numel();
@@ -872,6 +1013,44 @@ void Array2<T>::permute(std::vector<I>& p){
     }
   }
   debug_update_if(!std::is_sorted(s.begin(),s.end()), "Undoing the permutation ",p," failed. End result is ",s);
+}
+
+template<class T>
+template<class R>
+bool Array2<T>::is_permutation(const Array2<R>& other) const{
+  auto osh = other.shape();
+  for (ind_t i=0; i < ndim(); ++i) if (osh[i] != _shape[i]) return false;
+  for (ind_t i=0; i < _shape[0]; ++i){
+    const auto x{this->view(i)};
+    // if *this contains the same thing more than once, other must as well:
+    // NaN values would break this functionality since NaN == NaN is never true
+    if (this->count(cmp::eq, x) != other.count(cmp::eq, x)) return false;
+//    // the reverse should be true too, but is extraneous
+//    const auto y{other.view(i)};
+//    if (this->count(cmp::eq, y) != other.count(cmp::eq, y)) return false;
+  }
+  // *this and other share the same shape and all entries in both share the same multiplicity, so they're permutations
+  return true;
+}
+
+template<class T>
+template<class R>
+std::vector<ind_t> Array2<T>::permutation_vector(const Array2<R>& other) const {
+  auto not_present = [](const auto & a, const auto & b){
+    if (a.size() == 0) throw std::runtime_error("Can not find a not in b since a is empty");
+    if (b.size() == 0) return a[0];
+    const auto ptr = std::find_first_of(a.begin(), a.end(), b.begin(), b.end(),
+                                        [](const auto & x, const auto & y){return x != y;});
+    if (ptr == a.end())
+      throw std::runtime_error("b contains all of a!");
+    return *ptr;
+  };
+  std::vector<ind_t> perm;
+  for (ind_t i=0; i < _shape[0]; ++i){
+    auto others = other.find(cmp::eq, this->view(i));
+    perm.push_back(not_present(others, perm));
+  }
+  return perm;
 }
 
 template<class T>

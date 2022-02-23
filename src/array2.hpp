@@ -444,6 +444,10 @@ public:
   ind_t first(cmp expr, T val) const;
   ind_t last(cmp expr, T val) const;
   ind_t count(cmp expr, T val) const;
+  template<class R> ind_t first(cmp expr, const Array2<R>& val) const;
+  template<class R> ind_t last(cmp expr, const Array2<R>& val) const;
+  template<class R> ind_t count(cmp expr, const Array2<R>& val) const;
+  template<class R> std::vector<ind_t> find(cmp expr, const Array2<R>& val) const;
   Array2<bool> is(cmp expr, T val) const;
   std::vector<ind_t> find(cmp expr, T val) const;
   /*!\brief Determine the per-element truth-value of this Array2 compared with provided data
@@ -469,6 +473,7 @@ public:
           and provided data.
   */
   template<class R> std::vector<bool> row_is(cmp expr, const std::vector<R>& row) const;
+  template<class R> Array2<bool> row_is(cmp expr, const Array2<R> & that) const;
   /*!\brief Determine the element truth-value of this Array2 compared with provided data
 
   \param expr The comparison to be performed
@@ -519,6 +524,8 @@ public:
   Array2<T> contiguous_row_ordered_copy() const;
 
   Array2<T> abs() const;
+  template<class R> bool is_permutation(const Array2<R>& other) const;
+  template<class R> std::vector<ind_t> permutation_vector(const Array2<R>& other) const;
   //
 #if USE_HIGHFIVE
   // Read in from a file

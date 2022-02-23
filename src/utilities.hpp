@@ -688,9 +688,48 @@ std::vector<std::vector<I>> invert_lists(const std::vector<std::vector<I>> & lis
   return inverted;
 }
 
+template<class I>
+bool unordered_list_in_lists(const std::vector<I>& list, const std::vector<std::vector<I>>& lists){
+  for (const auto & x: lists) if (x.size() == list.size()){
+    bool equal{true};
+    for (const auto & y: list) if (std::find(x.begin(), x.end(), y) == x.end()) equal = false;
+    if (equal) return true;
+  }
+  return false;
+}
+
 #include "utilities.tpp"
 
   } // namespace utils
+
+  //! Return a new vector containing the reversed elements of a vector
+  template<class T>
+  std::vector<T> reverse(const std::vector<T> &x) {
+    std::vector<T> r;
+    for (size_t i = x.size(); i--;) r.push_back(x[i]);
+    return r;
+  }
+
+  //! Return a new vector with each element-vector's elements reversed
+  template<class T>
+  std::vector<std::vector<T>> reverse_each(const std::vector<std::vector<T>> &x) {
+    std::vector<std::vector<T>> r;
+    std::transform(x.begin(), x.end(), std::back_inserter(r), [](const std::vector<T> &y) { return reverse(y); });
+    // for (auto i: x) r.push_back(reverse(i));
+    return r;
+  }
+
+  //! Find the unique elements elements of a vector
+  template<typename T>
+  std::vector<T> unique(const std::vector<T> &x) {
+    std::vector<T> out;
+    out.push_back(x[0]);
+    for (auto &v: x)
+      if (std::find(out.begin(), out.end(), v) == out.end())
+        out.push_back(v);
+    return out;
+  }
+
 } // namespace brille
 
 

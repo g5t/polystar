@@ -31,6 +31,7 @@ along with brille. If not, see <https://www.gnu.org/licenses/>.            */
 #include <chrono>
 // #define VERBOSE_DEBUG
 // #define DEBUG // comment-out for no debugging output
+#define PRINTING_PRECISION 16
 namespace brille {
 // brille::abs (defined here instead of approx to avoid circular referencing)
 #if defined(DOXYGEN_SHOULD_SKIP_THIS)
@@ -112,8 +113,8 @@ const std::string my_to_string(const T x, const size_t width=0){
   size_t w{width};
   if constexpr (!std::is_integral<T>::value){
     streamobj << std::fixed;
-    streamobj << std::setprecision(4);
-    if (w>4) w -= 5u; // account for the decimal mark and four places
+    streamobj << std::setprecision(PRINTING_PRECISION);
+    if (w > PRINTING_PRECISION) w -= 1 + PRINTING_PRECISION; // account for the decimal mark and precision
   }
   // char may or may not be signed, depending on the system
   if constexpr (std::is_base_of<char,T>::value || (std::is_integral<T>::value && std::is_unsigned<T>::value) ){
@@ -133,8 +134,8 @@ const std::string my_to_string(const std::complex<T> x, const size_t width=0){
   size_t w{width};
   if (!std::is_integral<T>::value){
     streamobj << std::fixed;
-    streamobj << std::setprecision(4);
-    if (w>9) w -= 10u; // account for the decimal mark and four places
+    streamobj << std::setprecision(PRINTING_PRECISION);
+    if (w > 1 + 2 * PRINTING_PRECISION) w -= 2 + 2 * PRINTING_PRECISION;
   }
   if (!std::is_integral<T>::value || std::is_signed<T>::value){
     if (w>3) streamobj << std::setw(w-3); // -3 for -±i

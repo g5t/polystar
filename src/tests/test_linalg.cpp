@@ -48,7 +48,7 @@ TEST_CASE("approx","[approx]"){
   double d[16];
   for (int i = 1; i < 16; ++i) f[i] = float(1) / float(i + 1);
   for (int i = 1; i < 16; ++i) d[i] = double(1) / double(i + 1);
-  f[0] = 1e-12f; // this is smaller than the absolute tolerance in brille::approx ¯\_(ツ)_/¯
+  f[0] = 1e-15f; // this is smaller than the absolute tolerance in brille::approx ¯\_(ツ)_/¯
   d[0] = 1e-15;
   SECTION("brille::approx::scalar"){ for (int i=0; i<16; i++) REQUIRE( brille::approx::scalar(f[i],d[i]) ); }
   SECTION("brille::approx::array"){  REQUIRE( brille::approx::array<float,double,2,8>(f,d) ); }
