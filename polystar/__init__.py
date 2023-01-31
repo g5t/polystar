@@ -1,24 +1,24 @@
 # Copyright © 2020 Greg Tucker <greg.tucker@stfc.ac.uk>
 #
-# This file is part of brille.
+# This file is part of polystar.
 #
-# brille is free software: you can redistribute it and/or modify it under the
+# polystar is free software: you can redistribute it and/or modify it under the
 # terms of the GNU Affero General Public License as published by the Free
 # Software Foundation, either version 3 of the License, or (at your option)
 # any later version.
 #
-# brille is distributed in the hope that it will be useful, but
+# polystar is distributed in the hope that it will be useful, but
 # WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
 # or FITNESS FOR A PARTICULAR PURPOSE.
 #
 # See the GNU Affero General Public License for more details.
 # You should have received a copy of the GNU Affero General Public License
-# along with brille. If not, see <https://www.gnu.org/licenses/>.
+# along with polystar. If not, see <https://www.gnu.org/licenses/>.
 
-"""Python module :py:mod:`brille`
+"""Python module :py:mod:`polystar`
 =================================
 
-This module provides access to the C++ brille library which can be used to
+This module provides access to the C++ polystar library which can be used to
 interact with spacegroup and pointgroup symmetry operations, to determine the
 first Brillouin zone for a given real space crystallographic lattice, to
 find *an* irreducible polyhedron from the first Brillouin zone and the
@@ -27,18 +27,13 @@ point networks, and to perform linear-interpolation of user-provided data for
 any reciprocal space point at a symmetry-equivalent position within the
 connected point network.
 
-.. currentmodule:: brille
+.. currentmodule:: polystar
 
 .. autosummary::
     :toctree: _generate
 """
-
-try:
-    from ._polystar import *
-except ImportError:
-    # In build / tests, module might be in another folder on path
-    from _polystar import *
-
+from .bound import *
+from .lattice import Lattice
 from . import utils
 
 try:

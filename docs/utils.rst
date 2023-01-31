@@ -1,0 +1,2 @@
+.. automodule:: polystar.utils
+  :members:

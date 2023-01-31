@@ -1,34 +1,35 @@
-/* This file is part of brille
+/* This file is part of polystar
 
 Copyright © 2020-2022 Greg Tucker <gregory.tucker@ess.eu>
 
-brille is free software: you can redistribute it and/or modify it under the
+polystar is free software: you can redistribute it and/or modify it under the
 terms of the GNU Affero General Public License as published by the Free
 Software Foundation, either version 3 of the License, or (at your option)
 any later version.
 
-brille is distributed in the hope that it will be useful, but
+polystar is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
 or FITNESS FOR A PARTICULAR PURPOSE.
 See the GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with brille. If not, see <https://www.gnu.org/licenses/>.            */
+along with polystar. If not, see <https://www.gnu.org/licenses/>.            */
 
 /*! \file
     \author Greg Tucker
     \brief Two dimensional shared memory Array2 class definition.
 */
-#ifndef BRILLE_ARRAY2_HPP
-#define BRILLE_ARRAY2_HPP
+#ifndef POLYSTAR_ARRAY2_HPP
+#define POLYSTAR_ARRAY2_HPP
 #include <memory>
+#include <atomic>
 #include "subscript.hpp"
 #include "utilities.hpp"
 #include "comparisons.hpp"
 #include "types.hpp"
-#include "array_.hpp"
+#include "array_pre.hpp"
 #include "hdf_interface.hpp"
-namespace brille {
+namespace polystar {
 /*! \brief A multidimensional shared data array with operator overloads
 
 The `Array2<T>`` object holds a multidimensional shared data object plus
@@ -60,7 +61,7 @@ public:
       // Two arrays are not equal if their *stored values* are unequal.
       // Their raw pointers, total number of elements, shifts, references, mutabilities, and ownerships don't matter
       if (_shape != other._shape) return true;
-      for (auto sub: subItr()) if (this->operator[](sub) != other[sub]) return true;
+      for (const auto & sub: subItr()) if (this->operator[](sub) != other[sub]) return true;
       return false;
   }
   // accessors
@@ -117,12 +118,12 @@ public:
   }
   // empty initializer
   explicit Array2()
-  : _data(nullptr), _num(0), _shift(0u), _own(false), _ref(std::make_shared<char>()),
+  : _data(nullptr), _num(0), _shift(0u), _own(false), _ref(std::make_shared<std::atomic<char>>()),
   _mutable(false), _shape({0,0}), _stride({0,1})
   {}
   // 1D initializer
   Array2(T* data, const ind_t num, const bool own, const bool mut=true)
-  : _data(data), _num(num), _shift(0u), _own(own), _ref(std::make_shared<char>()),
+  : _data(data), _num(num), _shift(0u), _own(own), _ref(std::make_shared<std::atomic<char>>()),
     _mutable(mut), _shape({num,1}), _stride({1,1})
   {
     this->init_check();
@@ -130,7 +131,7 @@ public:
   // 2D initializer
   Array2(T* data, const ind_t num, const bool own,
     const shape_t& shape, const shape_t& stride, const bool mut=true)
-  : _data(data), _num(num), _shift(0u), _own(own), _ref(std::make_shared<char>()),
+  : _data(data), _num(num), _shift(0u), _own(own), _ref(std::make_shared<std::atomic<char>>()),
     _mutable(mut), _shape(shape), _stride(stride)
   {
     this->init_check();
@@ -279,7 +280,7 @@ public:
   {
     this->set_stride();
     this->construct();
-    for (auto x: this->subItr()) _data[s2l_d(x)] = static_cast<T>(other[x]);
+    for (const auto & x: this->subItr()) _data[s2l_d(x)] = static_cast<T>(other[x]);
   }
   template<class R>
   Array2<T>& operator=(const Array2<R>& other){
@@ -288,7 +289,7 @@ public:
     _shift = 0;
     this->set_stride();
     this->construct();
-    for (auto x: this->subItr()) _data[s2l_d(x)] = static_cast<T>(other[x]);
+    for (const auto & x: this->subItr()) _data[s2l_d(x)] = static_cast<T>(other[x]);
     return *this;
   }
 
@@ -314,6 +315,7 @@ protected: // so inherited classes can calculate subscript indexes into their da
     return sub2lin(x, y, _stride) + _shift;
   }
   [[nodiscard]] ind_t s2l_d(const shape_t& s) const {
+    assert(polystar::utils::subscript_ok(s, _shape));
     return sub2lin(s, _stride) + _shift;
   }
 private:
@@ -324,7 +326,7 @@ private:
   void construct() {
     _num = this->size_from_shape();
     if (_num > 0){
-      _ref = std::make_shared<char>();
+      _ref = std::make_shared<std::atomic<char>>();
       _data = new T[_num]();
       _own = true;
     } else {
@@ -336,16 +338,16 @@ private:
     this->construct();
     if (_num > 0 && _data != nullptr) std::fill(_data, _data+_num, init);
   }
-  void set_stride(void){
+  void set_stride(){
     _stride[1] = 1;
     _stride[0] = _shape[1];
   }
-  void init_check(void){
+  void init_check(){
     ind_t offset_size = _shift + this->size_from_shape(_shape);
     if (_num < offset_size) {
       std::string msg = "The shift { " + std::to_string(_shift) + " ";
       msg += "} and size { ";
-      for (auto x: _shape) msg += std::to_string(x) + " ";
+      for (const auto & x: _shape) msg += std::to_string(x) + " ";
       msg += "} of an Array2 must not exceed the allocated pointer size ";
       msg += std::to_string(_num);
       throw std::runtime_error(msg);
@@ -375,10 +377,10 @@ private:
       //subscript conversion necessary due to offset or strided array
       new_st = this->calculate_stride(_shape);
       //                                  vv(no offset)vvv         vvv(offset)vvv
-      for (auto x: this->subItr()) new_data[sub2lin(x,new_st)] = _data[this->s2l_d(x)];
+      for (const auto & x: this->subItr()) new_data[sub2lin(x,new_st)] = _data[this->s2l_d(x)];
     }
     bool new_own = true; // always take ownership of C++ allocated memory
-    auto new_ref = std::make_shared<char>(); // always use the default with C++ created arrays
+    auto new_ref = std::make_shared<std::atomic<char>>(); // always use the default with C++ created arrays
     bool new_mut = true; // new allocated memory should be mutable
     return Array2<T>(new_data, nnum, new_own, new_ref, _shape, new_st, new_mut);
   }
@@ -399,19 +401,19 @@ public:
   template<class I, size_t Nel> std::enable_if_t<std::is_integral_v<I>, Array2<T>> extract(const std::vector<std::array<I,Nel>>& i) const;
   Array2<T> extract(const Array2<bool>& i) const;
   Array2<T> extract(const std::vector<bool>& i) const;
-  bool set(const ind_t i, const Array2<T>& in);
+  bool set(ind_t i, const Array2<T>& in);
   template<class R>
-  bool set(const ind_t i, const Array2<R>& in);
-  bool set(const ind_t i, const std::vector<T>& in);
-  template<size_t Nel> bool set(const ind_t i, const std::array<T,Nel>& in);
+  bool set(ind_t i, const Array2<R>& in);
+  bool set(ind_t i, const std::vector<T>& in);
+  template<size_t Nel> bool set(ind_t i, const std::array<T,Nel>& in);
   T set(const shape_t& sub, T in);
-  Array2<T>& append(const ind_t, const Array2<T>&);
+  template<class R> std::enable_if_t<std::is_convertible_v<R,T>, Array2<T>&> append(ind_t, const Array2<R>&);
   [[nodiscard]] std::string to_string() const;
-  [[nodiscard]] std::string to_string(const ind_t) const;
+  [[nodiscard]] std::string to_string(ind_t) const;
 
   Array2<T>& reshape(const shape_t& ns);
   Array2<T>& resize(const shape_t&, T init=T(0));
-  template<class I> Array2<T>& resize(const I, T init=T(0));
+  template<class I> Array2<T>& resize(I, T init=T(0));
   [[nodiscard]] bool all(ind_t n=0) const;
   [[nodiscard]] bool any(ind_t n=0) const;
   [[nodiscard]] ind_t count(ind_t n=0) const;
@@ -437,19 +439,19 @@ public:
   T sum() const;
   T prod() const;
   template<class R, size_t Nel>
-  bool match(ind_t i, ind_t j, const std::array<R,Nel>& rot, int order=1) const;
-  bool match(ind_t i, ind_t j, ops op=ops::plus, T val=T{0}) const;
-  bool all(cmp expr, T val) const;
-  bool any(cmp expr, T val) const;
-  ind_t first(cmp expr, T val) const;
-  ind_t last(cmp expr, T val) const;
-  ind_t count(cmp expr, T val) const;
-  template<class R> ind_t first(cmp expr, const Array2<R>& val) const;
-  template<class R> ind_t last(cmp expr, const Array2<R>& val) const;
-  template<class R> ind_t count(cmp expr, const Array2<R>& val) const;
-  template<class R> std::vector<ind_t> find(cmp expr, const Array2<R>& val) const;
-  Array2<bool> is(cmp expr, T val) const;
-  std::vector<ind_t> find(cmp expr, T val) const;
+  bool match(ind_t i, ind_t j, const std::array<R,Nel>& rot, int order=1, T Ttol=T(0), int tol=1) const;
+  bool match(ind_t i, ind_t j, ops op=ops::plus, T val=T{0}, T Ttol=T(0), int tol=1) const;
+  bool all(cmp expr, T val, T Ttol=T(0), int tol=1) const;
+  bool any(cmp expr, T val, T Ttol=T(0), int tol=1) const;
+  ind_t first(cmp expr, T val, T Ttol=T(0), int tol=1) const;
+  ind_t last(cmp expr, T val, T Ttol=T(0), int tol=1) const;
+  ind_t count(cmp expr, T val, T Ttol=T(0), int tol=1) const;
+  template<class R> ind_t first(cmp expr, const Array2<R>& val, T Ttol=T(0), R Rtol=R(0), int tol=1) const;
+  template<class R> ind_t last(cmp expr, const Array2<R>& val, T Ttol=T(0), R Rtol=R(0), int tol=1) const;
+  template<class R> ind_t count(cmp expr, const Array2<R>& val, T Ttol=T(0), R Rtol=R(0), int tol=1) const;
+  template<class R> std::vector<ind_t> find(cmp expr, const Array2<R>& val, T Ttol=T(0), R Rtol=R(0), int tol=1) const;
+  Array2<bool> is(cmp expr, T val, T Ttol=T(0), int tol=1) const;
+  std::vector<ind_t> find(cmp expr, T val, T Ttol=T(0), int tol=1) const;
   /*!\brief Determine the per-element truth-value of this Array2 compared with provided data
 
   \param expr The comparison to be performed
@@ -462,7 +464,7 @@ public:
    le
         to the shape of this Array2.
   */
-  template<class R> Array2<bool> is(cmp expr, const Array2<R>& that) const;
+  template<class R> Array2<bool> is(cmp expr, const Array2<R>& that, T Ttol=T(0), R Rtol=R(0), int tol=1) const;
   /*!\brief Determine the per-row truth-value of this Array2 compared with provided data
 
   \param expr The comparison to be performed
@@ -472,8 +474,8 @@ public:
   \return The per-row truth value of the provided comparison between the stored
           and provided data.
   */
-  template<class R> std::vector<bool> row_is(cmp expr, const std::vector<R>& row) const;
-  template<class R> Array2<bool> row_is(cmp expr, const Array2<R> & that) const;
+  template<class R> std::vector<bool> row_is(cmp expr, const std::vector<R>& row, T Ttol=T(0), R Rtol=R(0), int tol=1) const;
+  template<class R> Array2<bool> row_is(cmp expr, const Array2<R> & rows, T Ttol=T(0), R Rtol=R(0), int tol=1) const;
   /*!\brief Determine the element truth-value of this Array2 compared with provided data
 
   \param expr The comparison to be performed
@@ -483,17 +485,18 @@ public:
   \return The per-element truth value of the provided comparison between the
           stored and provided data.
   */
-  template<class R> std::vector<bool> each_is(cmp expr, const std::vector<R>& vals) const;
-  template<class R> bool is(const Array2<R>& that) const;
+  template<class R> std::vector<bool> each_is(cmp expr, const std::vector<R>& vals, T Ttol=T(0), R Rtol=R(0), int tol=1) const;
+  template<class R> bool is(const Array2<R>& that, T Ttol=T(0), R Rtol=R(0), int tol=1) const;
   template<class R> bool operator==(const Array2<R>& that) const {return this->is(that);}
-  [[nodiscard]] std::vector<bool> is_unique() const;
-  [[nodiscard]] std::vector<ind_t> unique_idx() const;
-  Array2<T> unique() const;
+  [[nodiscard]] std::vector<bool> is_unique(T Ttol=T(0), int tol=1) const;
+  [[nodiscard]] std::vector<ind_t> unique_idx(T Ttol=T(0), int tol=1) const;
+  Array2<T> unique(T Ttol=T(0), int tol=1) const;
   Array2<T>  operator-() const;
   Array2<T>& operator +=(const T&);
   Array2<T>& operator -=(const T&);
   Array2<T>& operator *=(const T&);
   Array2<T>& operator /=(const T&);
+  Array2<T> operator ^(const T&);
   template<class R> Array2<T>& operator +=(const Array2<R>&);
   template<class R> Array2<T>& operator -=(const Array2<R>&);
   template<class R> Array2<T>& operator *=(const Array2<R>&);
@@ -505,18 +508,18 @@ public:
   bool swap(ind_t a, ind_t b);
   bool swap(ind_t i, ind_t a, ind_t b);
   std::vector<T> to_std() const;
-  T* ptr(const ind_t i0);
-  T* ptr(const ind_t i0, const ind_t j0);
+  T* ptr(ind_t i0);
+  T* ptr(ind_t i0, ind_t j0);
   T* ptr(const shape_t& partial_subscript);
-  const T* ptr(const ind_t i0) const;
-  const T* ptr(const ind_t i0, const ind_t j0) const;
+  const T* ptr(ind_t i0) const;
+  const T* ptr(ind_t i0, ind_t j0) const;
   const T* ptr(const shape_t& partial_subscript) const;
-  T& val(const ind_t i0);
-  T& val(const ind_t i0, const ind_t j0);
+  T& val(ind_t i0);
+  T& val(ind_t i0, ind_t j0);
   T& val(const shape_t& partial_subscript);
   template<class I> T& val(std::initializer_list<I> l);
-  const T& val(const ind_t i0) const;
-  const T& val(const ind_t i0, const ind_t j0) const;
+  const T& val(ind_t i0) const;
+  const T& val(ind_t i0, ind_t j0) const;
   const T& val(const shape_t& partial_subscript) const;
   template<class I> const T& val(std::initializer_list<I> l) const;
 
@@ -524,8 +527,8 @@ public:
   Array2<T> contiguous_row_ordered_copy() const;
 
   Array2<T> abs() const;
-  template<class R> bool is_permutation(const Array2<R>& other) const;
-  template<class R> std::vector<ind_t> permutation_vector(const Array2<R>& other) const;
+  template<class R> bool is_permutation(const Array2<R>& other, T Ttol=T(0), R Rtol=R(0), int tol=1) const;
+  template<class R> std::vector<ind_t> permutation_vector(const Array2<R>& other, T Ttol=T(0), R Rtol=R(0), int tol=1) const;
   //
 #if USE_HIGHFIVE
   // Read in from a file
@@ -545,11 +548,11 @@ public:
       shape_t shape{{static_cast<ind_t>(data_shape[0]),
                      static_cast<ind_t>(data_shape[1])}};
       shape_t stride{{shape[1], 1}};
-      return Array2<T>(data, num, true, shape, stride);
+      return Array2<T>(data, static_cast<ind_t>(num), true, shape, stride);
     }
     if (type == HighFive::ObjectType::Group){
-      ind_t no;
-      shape_t sh;
+      ind_t no{0};
+      shape_t sh{0,0};
       auto datagroup = obj.getGroup(node);
       if (!datagroup.hasAttribute("size")){
         throw std::runtime_error("How and or why is the size attribute missing?");
@@ -578,6 +581,11 @@ public:
   to_hdf(R& obj, const std::string& entry) const;
   bool to_hdf(const std::string& filename, const std::string& datasetname, const unsigned permissions=HighFive::File::OpenOrCreate) const;
 #endif //USE_HIGHFIVE
+
+  friend std::ostream & operator<<(std::ostream & os, const Array2<T>& a){
+    os << a.to_string();
+    return os;
+  }
 };
 
 /*!\brief An iterator for the Array2 class
@@ -651,5 +659,5 @@ public:
 
 
 #include "array2.tpp"
-} // end namespace brille
+} // end namespace polystar
 #endif // ARRAY_HPP

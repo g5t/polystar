@@ -1,25 +1,25 @@
-/* This file is part of brille.
+/* This file is part of polystar.
 
 Copyright © 2020 Greg Tucker <greg.tucker@stfc.ac.uk>
 
-brille is free software: you can redistribute it and/or modify it under the
+polystar is free software: you can redistribute it and/or modify it under the
 terms of the GNU Affero General Public License as published by the Free
 Software Foundation, either version 3 of the License, or (at your option)
 any later version.
 
-brille is distributed in the hope that it will be useful, but
+polystar is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
 or FITNESS FOR A PARTICULAR PURPOSE.
 See the GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with brille. If not, see <https://www.gnu.org/licenses/>.            */
+along with polystar. If not, see <https://www.gnu.org/licenses/>.            */
 /*! \file
     \author Greg Tucker
     \brief N-dimensional shared memory Array class definition
 */
-#ifndef BRILLE_ARRAY_HPP_
-#define BRILLE_ARRAY_HPP_
+#ifndef POLYSTAR_ARRAY_HPP_
+#define POLYSTAR_ARRAY_HPP_
 // #include <functional>
 // #include <algorithm>
 // #include <numeric>
@@ -33,11 +33,10 @@ along with brille. If not, see <https://www.gnu.org/licenses/>.            */
 #include "subscript.hpp"
 #include "utilities.hpp"
 #include "comparisons.hpp"
-// #include "approx.hpp"
 #include "types.hpp"
-#include "array_.hpp"
+#include "array_pre.hpp"
 // #include "array2.hpp"
-namespace brille {
+namespace polystar {
 /*! \brief A multidimensional shared data array with operator overloads
 
 The `Array<T>`` object holds a multidimensional shared data object plus
@@ -514,21 +513,21 @@ public:
   std::vector<T> to_std() const;
   T* ptr();
   T* ptr(const ind_t i0);
-  template<class ... Subs, class=std::enable_if_t<brille::utils::are_same<ind_t,Subs...>::value, void>>
+  template<class ... Subs, class=std::enable_if_t<polystar::utils::are_same<ind_t,Subs...>::value, void>>
   T* ptr(const ind_t i0, Subs... subscripts);
   T* ptr(const shape_t& partial_subscript);
   const T* ptr() const;
   const T* ptr(const ind_t i0) const;
-  template<class ... Subs, class=std::enable_if_t<brille::utils::are_same<ind_t,Subs...>::value, void>>
+  template<class ... Subs, class=std::enable_if_t<polystar::utils::are_same<ind_t,Subs...>::value, void>>
   const T* ptr(const ind_t i0, Subs... subscripts) const;
   const T* ptr(const shape_t& partial_subscript) const;
   T& val(const ind_t i0);
-  template<class ... Subs, class=std::enable_if_t<brille::utils::are_same<ind_t,Subs...>::value, void>>
+  template<class ... Subs, class=std::enable_if_t<polystar::utils::are_same<ind_t,Subs...>::value, void>>
   T& val(const ind_t i0, Subs... subscripts);
   T& val(const shape_t& partial_subscript);
   template<typename I> T& val(std::initializer_list<I> l);
   const T& val(const ind_t i0) const;
-  template<class ... Subs, class=std::enable_if_t<brille::utils::are_same<ind_t,Subs...>::value, void>>
+  template<class ... Subs, class=std::enable_if_t<polystar::utils::are_same<ind_t,Subs...>::value, void>>
   const T& val(const ind_t i0, Subs... subscripts) const;
   const T& val(const shape_t& partial_subscript) const;
   template<typename I> const T& val(std::initializer_list<I> l) const;
@@ -615,5 +614,5 @@ public:
 
 
 #include "array.tpp"
-} // end namespace brille
+} // end namespace polystar
 #endif // ARRAY_HPP

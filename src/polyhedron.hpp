@@ -1,22 +1,22 @@
-/* This file is part of brille
+/* This file is part of polystar
 
 Copyright © 2019-2022 Greg Tucker <gregory.tucker@ess.eu>
 
-brille is free software: you can redistribute it and/or modify it under the
+polystar is free software: you can redistribute it and/or modify it under the
 terms of the GNU Affero General Public License as published by the Free
 Software Foundation, either version 3 of the License, or (at your option)
 any later version.
 
-brille is distributed in the hope that it will be useful, but
+polystar is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
 or FITNESS FOR A PARTICULAR PURPOSE.
 See the GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with brille. If not, see <https://www.gnu.org/licenses/>.            */
+along with polystar. If not, see <https://www.gnu.org/licenses/>.            */
 
-#ifndef BRILLE_POLYHEDRON_H_
-#define BRILLE_POLYHEDRON_H_
+#ifndef POLYSTAR_POLYHEDRON_H_
+#define POLYSTAR_POLYHEDRON_H_
 /*! \file
     \author Greg Tucker
     \brief A class representing convex polyhedra in three dimensions
@@ -25,14 +25,14 @@ along with brille. If not, see <https://www.gnu.org/licenses/>.            */
 #include <utility>
 #include "tetgen.h"
 #include "geometry.hpp"
-namespace brille {
+namespace polystar {
 /*! \brief A three-dimensional convex solid with polygonal facets
 
 There is no mathematical restriction that a polygon be convex and concave
 polygons are handled by other computational geometry libraries. These libraries
 are much more complicated than is required here (as is supporting concave
 polygons), so this class is a minimal implementation of the general polygon
-tailored for `brille`.
+tailored for `polystar`.
 */
 class Polyhedron{
 public:
@@ -108,30 +108,40 @@ public:
   //! Create a convex-hull Polyhedron from a set of points
   explicit Polyhedron(const bArray<double>& v): vertices(v){
     verbose_update("Construct convex hull Polyhedron from vertices:\n", vertices.to_string());
+    debug_update("Convex Hull construction: \n", vertices.to_string());
     this->keep_unique_vertices();
-    if (vertices.size(0) > 3){
-      auto triplets = this->find_convex_hull();
-      auto fpv = this->find_all_faces_per_vertex(triplets);
-      std::tie(triplets, fpv) = this->polygon_vertices_per_face(triplets, fpv);
-      this->purge_central_polygon_vertices();
-      this->sort_polygons();
-      this->purge_extra_vertices(three_point_normal(vertices, triplets));
-      verbose_update("Finished constructing convex hull Polyhedron with",
-                     " vertices\n",vertices.to_string(), "faces\n", vertices_per_face);
+    debug_update("Unique vertices \n", vertices.to_string());
+    auto [a, b, c] = find_convex_hull_planes(vertices);
+    debug_update("Bounding planes (a, b, c) \n", cat(1, a, b, c).to_string());
+    // here's where we would double-check that the vertices are unique... but nothing has modified them
+
+    auto fpv = find_planes_containing_point(a, b, c, vertices);
+    debug_update("Faces per vertex\n", fpv);
+    // find the vertices for each face, remove a central vertices if present, sort remaining face by to winding angle
+    auto vpf = polygon_faces(a, b, c, fpv, vertices);
+    debug_update("Gives vertices per face\n", vpf);
+    // remove any vertices which are no longer part of a face -- takes the place of actual_vertex_purge
+    if (polygon_face_vertex_purge(vertices, vpf)){
+      debug_update("Some vertices purged. Now, vertices\n", vertices.to_string(), "vpf ", vpf);
     }
+    // convert vpf from ind_t to int, storing it in vertices_per_face
+    utils::convert_lists_type(vpf, vertices_per_face);
+    verbose_update("Finished constructing convex hull Polyhedron with", this->python_string());
   }
   //! Build a Polyhedron from vertices and vectors pointing to face centres
   Polyhedron(const bArray<double>& v, const bArray<double>& p):
   vertices(v) {
 //        FIXME
     this->keep_unique_vertices();
-    auto fpv = this->suboptimal_find_all_faces_per_vertex(p, p);
-    bArray<double> n(p), pp;
-    std::tie(n, pp, fpv) = this->suboptimal_polygon_vertices_per_face(n, p, fpv);
-    // this->sort_polygons();
-    this->purge_central_polygon_vertices();
-    this->sort_polygons();
-    this->purge_extra_vertices(p);
+    auto [a, b, c] = plane_points_from_normal(p, p);
+    auto fpv = find_planes_containing_point(a, b, c, vertices);
+    auto vpf = polygon_faces(a, b, c, fpv, vertices);
+    if (polygon_face_vertex_purge(vertices, vpf)){
+      debug_update("Some vertices purged");
+    }
+    // convert vpf from ind_t to int, storing it in vertices_per_face
+    utils::convert_lists_type(vpf, vertices_per_face);
+    verbose_update("Finished constructing vertex, point, Polyhedron with", this->python_string());
   }
 
   //! Build a Polyhedron from vertices, on-face points, and face normals
@@ -139,33 +149,33 @@ public:
     verbose_update("Construct a polyhedron from vertices:\n",vertices.to_string());
     verbose_update("and planes (points, normals):\n", cat(1,p,n).to_string());
     this->keep_unique_vertices();
-    auto fpv = this->suboptimal_find_all_faces_per_vertex(n, p);
-    bArray<double> nn, pp;
-    std::tie(nn, pp, fpv) = this->suboptimal_polygon_vertices_per_face(n, p, fpv);
-    // this->sort_polygons();
-    this->purge_central_polygon_vertices();
-    this->sort_polygons();
-    this->purge_extra_vertices(n);
+    auto [a, b, c] = plane_points_from_normal(n, p);
+    auto fpv = find_planes_containing_point(a, b, c, vertices);
+    auto vpf = polygon_faces(a, b, c, fpv, vertices);
+    if (polygon_face_vertex_purge(vertices, vpf)){
+      debug_update("Some vertices purged");
+    }
+    // convert vpf from ind_t to int, storing it in vertices_per_face
+    utils::convert_lists_type(vpf, vertices_per_face);
+    verbose_update("Finished constructing vertex, point, normal Polyhedron with", this->python_string());
   }
 
   //! initialize from vertices, and vertices_per_face (which must be correct)
   Polyhedron(const bArray<double>& v, std::vector<std::vector<int>> vpf): vertices(v), vertices_per_face(std::move(vpf)) {
-    this -> keep_unique_vertices();
-//    auto [n, p] = this->find_face_points_and_normals();
-    this->sort_polygons();
-    auto fpv = this->find_all_faces_per_vertex(get_facet_triplets()); // do we really need this?
-    verbose_update("Finished constructing Polyhedron with vertices\n",vertices.to_string(), "faces\n", vertices_per_face);
+    this->special_keep_unique_vertices(); // updates vertices_per_face too
+    auto vpf_ind_t = polygon_faces(utils::convert_lists_type<ind_t>(vertices_per_face), vertices);
+    if (polygon_face_vertex_purge(vertices, vpf_ind_t)){
+      info_update("This shouldn't happen. Why have you provided extraneous vertices?!");
+    }
+    utils::convert_lists_type(vpf_ind_t, vertices_per_face);
+    verbose_update("Finished constructing Polyhedron with vertices\n", this->python_string());
   }
-  //! initialize from vertices, point, normals, and vertices_per_face (which needs sorting)
-//  Polyhedron(const bArray<double>& v,const bArray<double>& p,const bArray<double>& n,std::vector<std::vector<int>> vpf):
+  //! initialize from vertices, normals, and vertices_per_face (which needs sorting)
   Polyhedron(const bArray<double>& v,const bArray<double>& n,std::vector<std::vector<int>> vpf):
           vertices(v), vertices_per_face(std::move(vpf)){
       this->verify_vertices_per_face(n); // verifies the vertices_per_face is correct
       this->sort_polygons();
-//      auto fpv = this->find_all_faces_per_vertex(get_facet_triplets());
-      verbose_update("Finished constructing Polyhedron with vertices\n",vertices.to_string(),
-                     "normals\n",n.to_string(),
-                     "faces\n", vertices_per_face);
+      verbose_update("Finished constructing Polyhedron with vertices\n", this->python_string());
   }
   //! copy constructor
   Polyhedron(const Polyhedron& other):
@@ -185,7 +195,7 @@ public:
   template<class T> Polyhedron rotate(const std::array<T,9> rot) const {
     bArray<double> newv(vertices.size(0),3u);
     for (ind_t i=0; i<vertices.size(0); ++i)
-      brille::utils::multiply_matrix_vector<double,T,double>(newv.ptr(i), rot.data(), vertices.ptr(i));
+      polystar::utils::multiply_matrix_vector<double,T,double>(newv.ptr(i), rot.data(), vertices.ptr(i));
     return {newv, this->vertices_per_face};
   }
   //! Move the origin of the returned Polyhedron
@@ -262,7 +272,7 @@ public:
   }
   //! Return the facets per vertex
   [[nodiscard]] std::vector<std::vector<int>> get_faces_per_vertex() const {
-    return brille::utils::invert_lists(vertices_per_face);
+    return polystar::utils::invert_lists(vertices_per_face);
   }
   //! Return the vertices per facet
   [[nodiscard]] std::vector<std::vector<int>> get_vertices_per_face() const {return vertices_per_face; }
@@ -317,6 +327,11 @@ public:
     debug_exec(repr += "; volume " +std::to_string(this->get_volume());)
     return repr;
   }
+  [[nodiscard]] std::string python_string() const {
+      std::string s{"(np.array("};
+      s += vertices.to_string() + "),\n" + lists_to_string(vertices_per_face) + ")";
+      return s;
+    }
   //! Return the volume of the Polyhedron
   [[nodiscard]] double get_volume() const {
     /* per, e.g., http://wwwf.imperial.ac.uk/~rn/centroid.pdf
@@ -337,8 +352,8 @@ public:
       for (size_t i=1; i<vertices_per_face[f].size()-1; ++i){ // loop over triangles
         auto ba = this->vertices.view(vertices_per_face[f][ i ]) - a;
         auto ca = this->vertices.view(vertices_per_face[f][i+1]) - a;
-        brille::utils::vector_cross(n, ba.ptr(0), ca.ptr(0));
-        subvol = brille::utils::vector_dot(a.ptr(0), n);
+        polystar::utils::vector_cross(n, ba.ptr(0), ca.ptr(0));
+        subvol = polystar::utils::vector_dot(a.ptr(0), n);
         volume += subvol;
       }
     }
@@ -356,7 +371,7 @@ public:
         auto c = vertices.view(verts[i+1]);
         auto ba = b-a;
         auto ca = c-a;
-        brille::utils::vector_cross(n, ba.ptr(0), ca.ptr(0));
+        polystar::utils::vector_cross(n, ba.ptr(0), ca.ptr(0));
         auto bc = b+c;
         ba = a+b;
         ca = c+a;
@@ -404,166 +419,6 @@ protected:
     }
   }
 
-  bArray<ind_t> find_convex_hull(){
-    /* Find the set of planes which contain all vertices.
-       The cross product between two vectors connecting three points defines a
-       plane normal. If the plane passing through the three points partitions
-       space into point-free and not-point-free then it is one of the planes of
-       the convex-hull.                                                       */
-    if (vertices.size(0) < 4) throw std::runtime_error("Not enough points to form a Polyhedron");
-    debug_update_if(vertices.size(0)<3, "find_convex_hull:: Not enough vertices for brille::utils::binomial_coefficient");
-    unsigned long long bc = brille::utils::binomial_coefficient(vertices.size(0), 3u);
-    if (bc > static_cast<unsigned long long>(std::numeric_limits<brille::ind_t>::max()))
-      throw std::runtime_error("Too many vertices to count all possible normals with a `size_t` integer");
-    bArray<double> n(static_cast<brille::ind_t>(bc), 3u);
-    bArray<double> p(static_cast<brille::ind_t>(bc), 3u);
-    bArray<ind_t> triplets(static_cast<brille::ind_t>(bc), 3u);
-    ind_t count = 0;
-    for (ind_t i=0; i<vertices.size(0)-2; ++i){
-      for (ind_t j=i+1; j<vertices.size(0)-1; ++j){
-        for (ind_t k=j+1; k<vertices.size(0); ++k){
-          bool positive{true}, negative{true};
-          for (ind_t r=0; (positive || negative) && r < vertices.size(0); ++r){
-            if (r == i || r == k || r == j) continue;
-            auto o3d = orient3d(vertices.ptr(i), vertices.ptr(j), vertices.ptr(k), vertices.ptr(r));
-            positive &= o3d >= 0;
-            negative &= o3d <= 0;
-          }
-          if (positive ^ negative){
-            // (T, T) -> (i, j, k) are co-linear so all points are co-planar
-            // (F, F) -> (i, j, k) do not divide the space into point-full and point-less
-            triplets[{count, 0}] = positive ? i : j;
-            triplets[{count, 1}] = positive ? j : i;
-            triplets[{count, 2}] = k;
-            n.set(count, three_point_normal(vertices, positive ? i : j, positive ? j : i, k));
-            ++count;
-          }
-        }
-      }
-    }
-    if (n.size(0) < count)
-      throw std::logic_error("Too many normal vectors found");
-    // check that we only keep one copy of each unique normal vector
-    n.resize(count);
-    triplets.resize(count);
-    auto nok = n.is_unique();
-    return triplets.extract(nok);
-  }
-  // This is the function which is bad for non-convex polyhedra, since it
-  // assigns all faces with n⋅(v-p)=0 to a vertex irrespective of whether two
-  // faces have opposite direction normals.
-  // We can not (easlily) get rid of this due to the need to build polyhedra from a set of vertices and planes
-  // known only as direction and offset
-  std::vector<std::vector<int>> suboptimal_find_all_faces_per_vertex(const bArray<double>& normals, const bArray<double>& points){
-    std::vector<std::vector<int>> fpv;
-    for (ind_t i=0; i<vertices.size(0); ++i){
-      std::vector<ind_t> onplane = dot(normals, vertices.view(i)-points).find(brille::cmp::eq,0.0);
-      std::vector<int> vind;
-      for (auto j: onplane) vind.push_back(static_cast<int>(j));
-      fpv.push_back(vind);
-    }
-    verbose_update("Found faces per vertex array\n",fpv);
-    return fpv;
-  }
-  // This is the function which is bad for non-convex polyhedra, since it
-  // assigns all faces with n⋅(v-p)=0 to a vertex irrespective of whether two
-  // faces have opposite direction normals.
-  std::vector<std::vector<int>> find_all_faces_per_vertex(const bArray<ind_t>& triplets){
-    std::vector<std::vector<int>> fpv;
-    fpv.reserve(vertices.size(0));
-    verbose_update("Find faces_per_vertex from planes\n", triplets.to_string());
-    for (ind_t i=0; i<vertices.size(0); ++i){
-      std::vector<int> op;
-      op.reserve(triplets.size(0));
-      for (ind_t j=0; j < triplets.size(0); ++j){
-        // use orient3d for exact on-plane-ness
-        auto o3d = orient3d(vertices.ptr(triplets[{j, 0}]), vertices.ptr(triplets[{j, 1}]), vertices.ptr(triplets[{j, 2}]), vertices.ptr(i));
-        if (o3d == 0) op.push_back(static_cast<int>(j));
-      }
-      fpv.push_back(op);
-    }
-    verbose_update("Found faces per vertex array\n",fpv);
-    return fpv;
-  }
-
-  std::tuple<bArray<double>, bArray<double>, std::vector<std::vector<int>>>
-  suboptimal_polygon_vertices_per_face(const bArray<double>& normals, const bArray<double>& points, std::vector<std::vector<int>>& faces_per_vertex) {
-    auto vpf = brille::utils::invert_lists(faces_per_vertex);
-    verbose_update("Found vertices per face array\n", vpf);
-    verbose_update("Compared to utils::invert_list -> ", brille::utils::invert_lists(faces_per_vertex));
-    // additionally, we only want to keep faces which describe polygons
-    std::vector<bool> is_polygon(vpf.size(), true);
-    for (size_t i=0; i<vpf.size(); ++i)
-      is_polygon[i] = face_has_area(vertices.extract(vpf[i]));
-    verbose_update("Face is polygon:",is_polygon);
-
-    auto extracted_points = points.extract(is_polygon);
-    auto extracted_normals = normals.extract(is_polygon);
-
-    // we should modify faces_per_vertex here, to ensure its indexing is correct
-    size_t count = 0, max=vpf.size(); std::vector<size_t> map;
-    for (size_t i=0; i<max; ++i) map.push_back(is_polygon[i] ? count++ : max);
-    std::vector<std::vector<int>> reduced_fpv(faces_per_vertex.size());
-    for (size_t i=0; i<faces_per_vertex.size(); ++i)
-        for (auto facet: faces_per_vertex[i]) if (is_polygon[facet])
-            reduced_fpv[i].push_back(static_cast<int>(map[facet]));
-    verbose_update("Faces per vertex reduced to\n", faces_per_vertex);
-
-    // plus cut-down the vertices_per_face vector
-    std::vector<std::vector<int>> polygon_vpf;
-    for (size_t i=0; i<vpf.size(); ++i) if (is_polygon[i]) polygon_vpf.push_back(vpf[i]);
-    this->vertices_per_face = polygon_vpf;
-    verbose_update("Vertices per (polygon) face\n", vertices_per_face);
-
-    // and finally ensure that the first three vertices of each face produce a normal pointing the *right* way
-    // since they are used later to define the face winding angle direction
-    auto n_dot_n = dot(extracted_normals, get_normals());
-    for (size_t i=0; i < vertices_per_face.size(); ++i){
-      if (n_dot_n.val(i) < 0.){
-        std::swap(vertices_per_face[i][0], vertices_per_face[i][1]);
-      }
-    }
-    return std::make_tuple(extracted_normals, extracted_points, reduced_fpv);
-  }
-
-  std::tuple<bArray<ind_t>, std::vector<std::vector<int>>>
-  polygon_vertices_per_face(const bArray<ind_t>& triplets, std::vector<std::vector<int>>& fpv) {
-    auto vpf = brille::utils::invert_lists(fpv);
-    verbose_update("Found vertices per face array\n", vpf);
-    // additionally, we only want to keep faces which describe polygons
-    std::vector<bool> is_polygon(vpf.size(), true);
-    for (size_t i=0; i<vpf.size(); ++i)
-      is_polygon[i] = face_has_area(vertices.extract(vpf[i]));
-    verbose_update("Face is polygon:",is_polygon);
-
-    // we should modify fpv here, to ensure its indexing is correct
-    size_t count = 0, max=vpf.size(); std::vector<size_t> map;
-    for (size_t i=0; i<max; ++i) map.push_back(is_polygon[i] ? count++ : max);
-    std::vector<std::vector<int>> reduced_fpv(fpv.size());
-    for (size_t i=0; i < fpv.size(); ++i)
-      for (auto facet: fpv[i]) if (is_polygon[facet])
-          reduced_fpv[i].push_back(static_cast<int>(map[facet]));
-    verbose_update("Faces per vertex reduced to\n", fpv);
-
-    // plus cut-down the vertices_per_face vector
-    std::vector<std::vector<int>> polygon_vpf;
-    for (size_t i=0; i<vpf.size(); ++i) if (is_polygon[i]) polygon_vpf.push_back(vpf[i]);
-    this->vertices_per_face = polygon_vpf;
-    verbose_update("Vertices per (polygon) face\n", vertices_per_face);
-
-    // and finally ensure that the first three vertices of each face produce a normal pointing the *right* way
-    // since they are used later to define the face winding angle direction
-    auto extracted = triplets.extract(is_polygon);
-    auto triplet_normals = three_point_normal(vertices, extracted);
-    auto n_dot_n = dot(triplet_normals, get_normals());
-    for (size_t i=0; i < vertices_per_face.size(); ++i){
-      if (n_dot_n.val(i) < 0.){
-        std::swap(vertices_per_face[i][0], vertices_per_face[i][1]);
-      }
-    }
-    return std::make_tuple(extracted, reduced_fpv);
-  }
-
   void verify_vertices_per_face(const bArray<double>& normals){
     // get_normals calculates normal vectors from the vertex index order of each face
     auto n_dot_n = dot(normals, get_normals());
@@ -584,33 +439,6 @@ protected:
     }
   }
 
-  void purge_central_polygon_vertices(){
-    /* We often build polyhedra from convex hulls of points and it is not
-       uncommon for such point sets to include central face polygon points.
-       Such points are not needed to describe the polyhedra and they inhibit
-       sort_polygons from working, as the normalisation of face vertices causes
-       a division by zero.
-    */
-    // Go through all faces an remove central vertices
-    verbose_update("Starting vertices_per_face\n",vertices_per_face);
-    for (size_t j=0; j<this->num_faces(); ++j){
-      //facet_normal = normals.extract(j);
-      auto facet_verts = vertices.extract(vertices_per_face[j]);
-      auto facet_centre = facet_verts.sum(0)/static_cast<double>(facet_verts.size(0));
-      facet_verts -= facet_centre;
-      auto is_centre = norm(facet_verts).is(brille::cmp::eq,0.).to_std(); // std::vector needed for erase
-      verbose_update("Face ",j," vertices are central (1) or not (0):", is_centre);
-      for (size_t i=0; i<vertices_per_face[j].size();){
-        if (is_centre[i]){
-          is_centre.erase(is_centre.begin()+i);
-          vertices_per_face[j].erase(vertices_per_face[j].begin()+i);
-        } else {
-          ++i;
-        }
-      }
-    }
-    this->actual_vertex_purge();
-  }
   void actual_vertex_purge(){
     // go through all faces again and determine whether a vertex is present
     std::vector<bool> keep(vertices.size(0), false);
@@ -643,14 +471,14 @@ protected:
     auto all_normals = this->get_normals();
     for (ind_t j=0; j<this->vertices_per_face.size(); ++j){
       facet = this->vertices_per_face[j];
-      verbose_update("Sorting face ",j," which has vertices",facet);
+//      verbose_update("Sorting face ",j," which has vertices",facet);
       auto facet_normal = all_normals.view(j);
       auto facet_verts = vertices.extract(facet);
       auto facet_centre = facet_verts.sum(0)/static_cast<double>(facet.size());
       facet_verts -= facet_centre; // these are now on-face vectors to each vertex
       // if a point happens to be at the face centre dividing by the norm is a problem.
       facet_verts = facet_verts/norm(facet_verts); // and now just their directions;
-      verbose_update("With on-plane vectors\n",facet_verts.to_string());
+//      verbose_update("With on-plane vectors\n",facet_verts.to_string());
       perm.resize(facet.size());
       perm[0] = 0; // always start with whichever vertex is first
       used.clear();
@@ -661,7 +489,7 @@ protected:
         min_idx=static_cast<ind_t>(facet.size())+1;
         for (ind_t k=0; k<facet.size(); ++k)
           if ( std::find(used.begin(),used.end(),k)==used.end() // ensure the point hasn't already been picked
-               && !brille::approx::scalar(angles[k], 0.0) // that its not along the same line
+               && !polystar::approx_float::scalar(angles[k], 0.0) // that its not along the same line
                && angles[k] < min_angle // and that it has a smaller winding angle
              ){
             min_idx=k;
@@ -672,7 +500,7 @@ protected:
           for (ind_t qq=0; qq < facet_verts.size(0); ++qq){
             for (ind_t ww=qq+1; ww < facet_verts.size(0); ++ww){
               auto val = (facet_verts.view(qq) - facet_verts.view(ww)).abs().sum();
-              if (val < 1) msg +=  "(" + std::to_string(qq) + "," + std::to_string(ww) + ") -> " + std::to_string(val * 1e15) + "x10^-15\n";
+              if (val < 1e-8) msg +=  "(" + std::to_string(qq) + "," + std::to_string(ww) + ") -> " + std::to_string(val * 1e15) + "x10^-15\n";
             }
           }
           for (size_t d=0; d<facet.size(); ++d)
@@ -682,61 +510,19 @@ protected:
           msg += "Winding angles [ ";
           for (auto ang: angles) msg += std::to_string(ang) + " ";
           msg += "]";
+          msg += "\n" + this->python_string();
           throw std::runtime_error(msg);
         }
         perm[i] = min_idx;
         used.push_back(min_idx);
       }
-      verbose_update("Producing sorting permutation",perm);
+//      verbose_update("Producing sorting permutation",perm);
       std::vector<int> sorted_face_v;
       for (size_t i=0; i<facet.size(); ++i) sorted_face_v.push_back(facet[perm[i]]); // this could be part of the preceeding loop.
       // and add this face to the output collection
       sorted_vpp.push_back(sorted_face_v);
     }
     this->vertices_per_face = sorted_vpp;
-  }
-  void purge_extra_vertices(const bArray<double>& normals){
-    /* If we used our convex hull algorithm to determine our polygon, it might
-    have extraneous vertices within its convex polygonal faces */
-    /* This method should be used only after find_all_faces_per_vertex,
-      polygon_vertices_per_face, and sort_polygons have all been run as it
-      assumes that the vertices per face are in increasing-winding-order.
-    */
-    for (ind_t n=0; n<normals.size(0); ++n){
-      verbose_update("A face with vertices ", vertices_per_face[n]);
-      for (size_t i=0, j; vertices_per_face[n].size()>3 && i<vertices_per_face[n].size();){
-        // pull out the vector from the previous point to this one
-        j = (vertices_per_face[n].size()+i-1)%vertices_per_face[n].size();
-        auto prev = vertices.view(vertices_per_face[n][i]) - vertices.view(vertices_per_face[n][j]);
-        // pull out the vector from this point to the next one
-        j = (vertices_per_face[n].size()+i+1)%vertices_per_face[n].size();
-        auto next = vertices.view(vertices_per_face[n][j]) - vertices.view(vertices_per_face[n][i]);
-
-        // check whether the cross product points the same way as the face normal
-        if (dot(normals.view(n), cross(prev, next)).all(brille::cmp::gt, 0.)) {
-          // left-turn, keep this point
-          ++i;
-        } else {
-          // right-turn, remove this point.
-          vertices_per_face[n].erase(vertices_per_face[n].begin()+i);
-        }
-      }
-      verbose_update("Is a convex polygonal face with vertices ", vertices_per_face[n]);
-    }
-    this->actual_vertex_purge();
-  }
-  std::tuple<bArray<double>, bArray<double>> find_face_points_and_normals(){
-    // if the Polyhedron is defined from its vertices and vertices_per_face,
-    // then we require the input to be correct, and calculate points and normals
-    bArray<double> normals(this->num_faces(), 3u), points(this->num_faces(), 3u);
-    ind_t count = 0;
-    for (const auto& face: vertices_per_face){
-      auto fv = vertices.extract(face);
-      auto centre = fv.sum(0)/static_cast<double>(face.size());
-      points.set(count, centre);
-      normals.set(count++, three_point_normal(fv, 0, 1, 2));
-    }
-    return std::make_tuple(normals, points);
   }
 public:
   //! Return a copy of this Polyhedron with its centre of mass at the origin
@@ -755,7 +541,7 @@ public:
     auto normals = this->get_normals();
     auto points = this->get_points();
     for (ind_t i=0; i<x.size(0); ++i)
-      out.push_back(dot(normals, x.view(i)-points).all(brille::cmp::le, 0.));
+      out.push_back(dot(normals, x.view(i)-points).all(polystar::cmp::le, 0.));
     return out;
   }
   /* Since we have the machinery to bisect a Polyhedron by a series of planes,
@@ -769,7 +555,7 @@ public:
   //! Determine if the intersection of another Polyhedron with this one is non-null
   [[nodiscard]] bool intersects(const Polyhedron& other) const {
     // If two polyhedra intersect one another, their intersection is not null.
-    return !brille::approx::scalar(this->intersection(other).get_volume(), 0.);
+    return !polystar::approx_float::scalar(this->intersection(other).get_volume(), 0.);
   }
   //! Return the intersection of another Polyhedron and this one
   [[nodiscard]] Polyhedron intersection(const Polyhedron& other) const {
@@ -802,7 +588,7 @@ public:
       for (const auto & vertex: face){
         o3d.push_back(orient3d(a.ptr(0), b.ptr(0), c.ptr(0), vertices.ptr(vertex)));
       }
-      auto all_zero = std::all_of(o3d.begin(), o3d.end(), [](const auto & x){return approx::scalar(x, 0.);});
+      auto all_zero = std::all_of(o3d.begin(), o3d.end(), [](const auto & x){return approx_float::scalar(x, 0.);});
       if (all_zero){
         all_zero = dot(three_point_normal(vertices, face[0], face[1], face[2]), three_point_normal(a, b, c)).all(cmp::gt, 0.);
       }
@@ -817,7 +603,7 @@ public:
   }
 
   template<class T>
-  bool none_beyond(const bArray<T>& a, const bArray<T>& b, const bArray<T>& c) const {
+  [[nodiscard]] bool none_beyond(const bArray<T>& a, const bArray<T>& b, const bArray<T>& c) const {
     auto match = matching_face_index(a, b, c);
     std::vector<int> v(vertices.size(0));
     std::iota(v.begin(), v.end(), 0);
@@ -825,10 +611,10 @@ public:
       auto itr = std::remove_if(v.begin(), v.end(), [f=vertices_per_face[match]](const auto & x){return std::find(f.begin(), f.end(), x) != f.end();});
       v.erase(itr, v.end());
     }
-    for (const auto & i: v){
-      if (orient3d(a.ptr(0), b.ptr(0), c.ptr(0), vertices.ptr(i)) < 0) return false;
-    }
-    return true;
+    auto is_negative = [&](const auto & i){
+      return orient3d(a.ptr(0), b.ptr(0), c.ptr(0), vertices.ptr(i)) < 0;
+    };
+    return std::all_of(v.begin(), v.end(), is_negative);
   }
 
   /*! Find the polyhedron which results from slicing an existant polyhedron by
@@ -847,9 +633,9 @@ public:
     auto vpf = pout.get_vertices_per_face();
     // move the output polyhedron to be centred on the origin -- which requires we move all cutting planes as well
     // auto origin = sum(pv)/static_cast<double>(pv.size(0));
-    verbose_update("Cut a ",pout.string_repr()," by ",p_a.size(0)," planes");
+    debug_update("Cut a ",pout.string_repr()," by ",p_a.size(0)," planes");
     for (ind_t i=0; i<p_a.size(0); ++i){
-      if (brille::approx::scalar(pout.get_volume(), 0.)) break; // we can't do anything with an empty polyhedron
+      if (polystar::approx_float::scalar(pout.get_volume(), 0.)) break; // we can't do anything with an empty polyhedron
       verbose_update("Cut with a plane passing through ",p_a.to_string(i),", ",p_b.to_string(i),", and ",p_c.to_string(i), " with normal ", three_point_normal(p_a, p_b, p_c).to_string(i));
       auto a_i = p_a.view(i);
       auto b_i = p_b.view(i);
@@ -874,19 +660,11 @@ public:
           auto at = edge_plane_intersection(pv, vpf[cut[j]], vpf[cut[k]], a_i, b_i, c_i);
           if ( at.size(0) == 1 ){ // there is a single intersection
             int lv;
-            verbose_update("Cut facets ", cut[j]," and ", cut[k]);
-            auto existing = pv.view(0, pv.size(0) - new_vertex_count);
-            auto existing_v = static_cast<int>(existing.first(brille::cmp::eq, at));
-            auto added_v = new_vertex_count > 0 ? static_cast<int>(pv.view(pv.size(0) - new_vertex_count, pv.size(0)).first(brille::cmp::eq, at)) : 1;
-            if (existing_v < static_cast<int>(pv.size(0) - new_vertex_count)){
-              info_update("We found an exisitng vertex");
-            }
-            if (added_v < static_cast<int>(new_vertex_count)){
-              info_update("We found an added vertex");
-            }
-
-            auto index = pv.first(brille::cmp::eq, at); // == pv.size(0) if at is not in pv
+//            verbose_update("Cut facets ", cut[j]," and ", cut[k]);
+            auto index = pv.first(polystar::cmp::eq, at); // == pv.size(0) if at is not in pv
             if (index < pv.size(0)){
+              verbose_update("Cut facets ", cut[j]," and ", cut[k], " use vertex at ",pv.view(index).to_string(),
+                             "             for intersection at ",at.to_string(0));
               if (index >= pv.size(0) - new_vertex_count) {
                 // this is a vertex added during this cut -- we want to keep its average?
                 info_update("Figure out this whole averaging thing");
@@ -894,29 +672,15 @@ public:
               keep[index] = true; // ensure that we don't accidentally remove a needed vertex
 
             } else {
+              verbose_update("Cut facets ", cut[j]," and ", cut[k], " add intersection at ",at.to_string(0));
               pv.append(0, at);
               ++new_vertex_count;
             }
             lv = static_cast<int>(index); // why is lv an int again?
 
-//
-//            if (norm(pv-at).all(brille::cmp::neq, 0.)){  /* only add a point if its new */
-//              // grab the index of the next-added vertex
-//              lv = static_cast<int>(pv.size(0));
-//              verbose_update("Add intersection at point ",at.to_string(0));
-//              pv.append(0, at);
-//              // track how many new vertices we add
-//              ++new_vertex_count;
-//            } else {
-//              // find the matching index that already is in the list:
-//              lv = static_cast<int>(pv.first(brille::cmp::eq, at));
-//              verbose_update("Reusing existing intersection point ",pv.to_string(lv)," for found intersection ",at.to_string(0));
-//              keep[lv] = true; // just in case
-//            }
-
             // add the new vertex to the list for each existing facet -- if it's not already present
-            brille::utils::add_if_missing(vpf[cut[j]], lv);
-            brille::utils::add_if_missing(vpf[cut[k]], lv);
+            polystar::utils::add_if_missing(vpf[cut[j]], lv);
+            polystar::utils::add_if_missing(vpf[cut[k]], lv);
             // and the yet-to-be-created facet
             new_vector.push_back(lv);
             // keeping track of how many points
@@ -932,7 +696,7 @@ public:
         }
         // extend the keep std::vector<bool> to cover the new points
         for (size_t z=0; z<new_vertex_count; ++z) keep.push_back(true);
-        verbose_update("keep:",keep,"vertices:\n", pv.to_string());
+//        verbose_update("keep:",keep,"vertices:\n", pv.to_string());
         // find the new indices for all vertices, and extract the kept vertices
         vertex_map.resize(pv.size(0));
         int count{0};
@@ -943,33 +707,33 @@ public:
             return Polyhedron();
         }
         auto new_pv = pv.extract(keep);
-        verbose_update("vertex mapping:", vertex_map);
+//        verbose_update("vertex mapping:", vertex_map);
         // go through the vertices_per_face array, replacing vertex indicies
         // and making a face map to skip now-empty faces
-        verbose_update("vertices per face:\n", vpf);
+//        verbose_update("vertices per face:\n", vpf);
         for (auto & face : vpf){
           std::vector<int> nnv;
           for (auto x: face) if (keep[x]) nnv.push_back(vertex_map[x]);
           if (nnv.empty()) nnv.push_back(0); // avoid having an unallocated face. Removed later
           nnv = unique(nnv); // remove duplicates (where do they come from?)
           if (nnv.size() > 2 && !(keep[face[0]] && keep[face[1]] && keep[face[2]])){
-            if (dot(three_point_normal(pv, face), three_point_normal(new_pv, nnv)).all(brille::cmp::le, 0.))
+            if (dot(three_point_normal(pv, face), three_point_normal(new_pv, nnv)).all(polystar::cmp::le, 0.))
               std::swap(nnv[1], nnv[2]);
           }
           face = nnv;
         }
         pv = new_pv; // done with normals, so we can switch to the reduced vertices
-        verbose_update("gets reduced to:\n", vpf);
+//        verbose_update("gets reduced to:\n", vpf);
 
         // remove any faces without three vertices
         std::vector<bool> has3v;
         has3v.reserve(vpf.size());
         for (const auto & j : vpf) has3v.push_back(unique(j).size()>2);
-        verbose_update("Keep faces with 3+ vertices: ", has3v);
+//        verbose_update("Keep faces with 3+ vertices: ", has3v);
         pn = pn.extract(has3v);
         // and remove their empty vertex lists
         vpf.erase(std::remove_if(vpf.begin(), vpf.end(), [](const std::vector<int> & i){return unique(i).size()<3;}), vpf.end());
-        verbose_update("So that vertices per face becomes\n", vpf);
+//        verbose_update("So that vertices per face becomes\n", vpf);
 
         // remove any faces that are not connected on all sides
         bool check_again{true};
@@ -1003,11 +767,9 @@ public:
         if (std::count(kv.begin(), kv.end(), false)){
           std::vector<int> kv_map;
           int kv_count{0};
-          kv_map.reserve(kv.size());
           for (auto && j : kv) kv_map.push_back(j ? kv_count++ : -1);
           for (auto & face: vpf){
             std::vector<int> nnv;
-            nnv.reserve(face.size());
             for (auto & x: face) nnv.push_back(kv_map[x]);
             face = nnv;
           }
@@ -1029,6 +791,7 @@ public:
         vpf = pout.get_vertices_per_face();
       }
     }
+    debug_update("Cut down to a ", pout.string_repr(), "\n", pout.python_string());
     return pout;
   }
   //! Construst a list of random points within the volume of the Polyhedron via rejection
@@ -1081,16 +844,16 @@ public:
 
 //! Construct a Polyhedron box from its minimal and maximal vertices
 template<class T>
-Polyhedron polyhedron_box(std::array<T,3>& x_min, std::array<T,3>& x_max){
+Polyhedron polyhedron_box(std::array<T,3>& xmin, std::array<T,3>& xmax){
   std::vector<std::array<T,3>> v{
-    {x_min[0], x_min[1], x_min[2]}, // 000 0
-    {x_min[0], x_max[1], x_min[2]}, // 010 1
-    {x_min[0], x_max[1], x_max[2]}, // 011 2
-    {x_min[0], x_min[1], x_max[2]}, // 001 3
-    {x_max[0], x_min[1], x_min[2]}, // 100 4
-    {x_max[0], x_max[1], x_min[2]}, // 110 5
-    {x_max[0], x_max[1], x_max[2]}, // 111 6
-    {x_max[0], x_min[1], x_max[2]}  // 101 7
+    {xmin[0], xmin[1], xmin[2]}, // 000 0
+    {xmin[0], xmax[1], xmin[2]}, // 010 1
+    {xmin[0], xmax[1], xmax[2]}, // 011 2
+    {xmin[0], xmin[1], xmax[2]}, // 001 3
+    {xmax[0], xmin[1], xmin[2]}, // 100 4
+    {xmax[0], xmax[1], xmin[2]}, // 110 5
+    {xmax[0], xmax[1], xmax[2]}, // 111 6
+    {xmax[0], xmin[1], xmax[2]}  // 101 7
   };
   std::vector<std::vector<int>> vpf{{3,0,4,7},{3,2,1,0},{0,1,5,4},{3,7,6,2},{7,4,5,6},{2,6,5,1}};
   return Polyhedron(bArray<double>::from_std(v), vpf);
@@ -1098,22 +861,22 @@ Polyhedron polyhedron_box(std::array<T,3>& x_min, std::array<T,3>& x_max){
 
   template<class T>
   Polyhedron point_bounding_box(const bArray<T>& points){
-    auto x_min = points.min(0);
-    auto x_max = points.max(0);
+    auto xmin = points.min(0);
+    auto xmax = points.max(0);
     std::vector<std::array<T,3>> v{
-      {x_min[{0, 0}], x_min[{0, 1}], x_min[{0, 2}]}, // 000 0
-      {x_min[{0, 0}], x_max[{0, 1}], x_min[{0, 2}]}, // 010 1
-      {x_min[{0, 0}], x_max[{0, 1}], x_max[{0, 2}]}, // 011 2
-      {x_min[{0, 0}], x_min[{0, 1}], x_max[{0, 2}]}, // 001 3
-      {x_max[{0, 0}], x_min[{0, 1}], x_min[{0, 2}]}, // 100 4
-      {x_max[{0, 0}], x_max[{0, 1}], x_min[{0, 2}]}, // 110 5
-      {x_max[{0, 0}], x_max[{0, 1}], x_max[{0, 2}]}, // 111 6
-      {x_max[{0, 0}], x_min[{0, 1}], x_max[{0, 2}]}  // 101 7
+      {xmin[{0, 0}], xmin[{0,1}], xmin[{0,2}]}, // 000 0
+      {xmin[{0, 0}], xmax[{0,1}], xmin[{0,2}]}, // 010 1
+      {xmin[{0, 0}], xmax[{0,1}], xmax[{0,2}]}, // 011 2
+      {xmin[{0, 0}], xmin[{0,1}], xmax[{0,2}]}, // 001 3
+      {xmax[{0, 0}], xmin[{0,1}], xmin[{0,2}]}, // 100 4
+      {xmax[{0, 0}], xmax[{0,1}], xmin[{0,2}]}, // 110 5
+      {xmax[{0, 0}], xmax[{0,1}], xmax[{0,2}]}, // 111 6
+      {xmax[{0, 0}], xmin[{0,1}], xmax[{0,2}]}  // 101 7
     };
     std::vector<std::vector<int>> vpf{{3,0,4,7},{3,2,1,0},{0,1,5,4},{3,7,6,2},{7,4,5,6},{2,6,5,1}};
     return Polyhedron(bArray<double>::from_std(v), vpf);
   }
 
 
-} // end namespace brille
-#endif // BRILLE_POLYHEDRON_H_
+} // end namespace polystar
+#endif // POLYSTAR_POLYHEDRON_H_

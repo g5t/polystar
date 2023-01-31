@@ -3,9 +3,9 @@
 
 void wrap_debug(pybind11::module &m){
     using namespace pybind11::literals;
-    using namespace brille;
+    using namespace polystar;
     m.def("emit", [&](){return !printer.silenced();},R"pbdoc(
-Return the output status of the :py:mod:`brille` status printer.
+Return the output status of the :py:mod:`polystar` status printer.
 
 Returns
 -------
@@ -20,8 +20,8 @@ bool
       info_update_if( emt && !orig, "Printing turned on");
       info_update_if(!emt && !orig, "Keeping printing off"); // never printed
       return !printer.silenced();
-    }, "brille::printer emit status"_a,R"pbdoc(
-Modify the output status of the :py:mod:`brille` status printer.
+    }, "polystar::printer emit status"_a,R"pbdoc(
+Modify the output status of the :py:mod:`polystar` status printer.
 
 Parameters
 ----------
@@ -35,7 +35,7 @@ bool
 )pbdoc");
 
     m.def("emit_datetime", [&](){return printer.datetime();}, R"pbdoc(
-Return the timestamp output status of the :py:mod:`brille` status printer.
+Return the timestamp output status of the :py:mod:`polystar` status printer.
 
 Returns
 -------
@@ -50,8 +50,8 @@ bool
       info_update_if( emt && !orig, "Datetime printing turned on");
       info_update_if(!emt && !orig, "Keeping datetime printing off");
       return printer.datetime();
-    }, "brille::printer emit datetime status"_a, R"pbdoc(
-Modify the timestamp output status of the :py:mod:`brille` status printer.
+    }, "polystar::printer emit datetime status"_a, R"pbdoc(
+Modify the timestamp output status of the :py:mod:`polystar` status printer.
 
 Parameters
 ----------

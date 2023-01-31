@@ -1,19 +1,19 @@
-/* This file is part of brille.
+/* This file is part of polystar.
 
 Copyright © 2019,2020 Greg Tucker <greg.tucker@stfc.ac.uk>
 
-brille is free software: you can redistribute it and/or modify it under the
+polystar is free software: you can redistribute it and/or modify it under the
 terms of the GNU Affero General Public License as published by the Free
 Software Foundation, either version 3 of the License, or (at your option)
 any later version.
 
-brille is distributed in the hope that it will be useful, but
+polystar is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
 or FITNESS FOR A PARTICULAR PURPOSE.
 See the GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with brille. If not, see <https://www.gnu.org/licenses/>.            */
+along with polystar. If not, see <https://www.gnu.org/licenses/>.            */
 
 // trace of a square matrix
 template<typename T, int N> T trace(const T *M){
@@ -264,7 +264,7 @@ template<class I, class T> T vector_angle(const I n, const T* A, const T* B){
     c_t = (nA || nB) ? T(0) : T(1);
   }
   T act = std::abs(c_t);
-  if (brille::approx::scalar(act, 1.0) && act>1){
+  if (polystar::approx_float::scalar(act, 1.0) && act>1){
     c_t /= act;
     act = std::abs(c_t);
   }
@@ -300,7 +300,7 @@ template<class I, class T> T euclidean_angle(const I n, const std::complex<T>* A
     c_t = (nA || nB) ? T(0) : T(1);
   }
   T act = std::abs(c_t);
-  if (brille::approx::scalar(act, 1.0) && act>1){
+  if (polystar::approx_float::scalar(act, 1.0) && act>1){
     c_t /= act;
     act = std::abs(c_t);
   }
@@ -367,7 +367,7 @@ template<class I, class T> T hermitian_angle(const I n, const std::complex<T>* A
     c_t = (nA || nB) ? T(0) : T(1);
   }
   T act = std::abs(c_t);
-  if (brille::approx::scalar(act,1.0) && act>1){
+  if (polystar::approx_float::scalar(act,1.0) && act>1){
     c_t/=act; // force close-to-one values to one, maintaining the sign
     act = std::abs(c_t);
   }

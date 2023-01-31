@@ -1,19 +1,19 @@
-/* This file is part of brille
+/* This file is part of polystar
 
 Copyright © 2019-2022 Greg Tucker <gregory.tucker@ess.eu>
 
-brille is free software: you can redistribute it and/or modify it under the
+polystar is free software: you can redistribute it and/or modify it under the
 terms of the GNU Affero General Public License as published by the Free
 Software Foundation, either version 3 of the License, or (at your option)
 any later version.
 
-brille is distributed in the hope that it will be useful, but
+polystar is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
 or FITNESS FOR A PARTICULAR PURPOSE.
 See the GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with brille. If not, see <https://www.gnu.org/licenses/>.            */
+along with polystar. If not, see <https://www.gnu.org/licenses/>.            */
 
 template<class T>
 Array2<T> Array2<T>::view() const{
@@ -38,11 +38,12 @@ Array2<T> Array2<T>::view(const ind_t i, const ind_t j) const {
     osize[0] = j-i;
     return Array2<T>(_data, _num, oshft, _own, _ref, osize, _stride, false);
   }
-  std::string msg{"Array2 view indexing error since"};
-  if (i>=j) msg += " " + std::to_string(i) + " is not less than " + std::to_string(j);
-  if (i >= _shape[0]) msg +=  " " + std::to_string(i) + " >= shape " + std::to_string(_shape[0]);
-  if (j > _shape[0]) msg +=  " " + std::to_string(j) + " > shape " + std::to_string(_shape[0]);
-  throw std::runtime_error(msg);
+  if (i==j) {
+    shape_t shape{_shape};
+    shape[0] = 0;
+    return Array2<T>(shape);
+  }
+  throw std::runtime_error("Array2 view indexing error");
 }
 
 template<class T>
@@ -115,7 +116,7 @@ Array2<T>::extract(const std::array<I,Nel>& i) const
 // {
 //   for (auto a: i) for (auto x: a) if (!(0 <= x && static_cast<ind_t>(x) < _shape[0]))
 //     throw std::runtime_error("Array2 extract index must be in range");
-//   brille::shape_t osh{static_cast<ind_t>(i.size()), static_cast<ind_t>(Nel)};
+//   polystar::shape_t osh{static_cast<ind_t>(i.size()), static_cast<ind_t>(Nel)};
 //   for (ind_t i=1; i<this->ndim(); ++i)
 //     osh.push_back(_shape[i]);
 //   Array<T> out(osh);
@@ -243,10 +244,12 @@ T Array2<T>::set(const shape_t& sub, const T in){
 
 template<class T>
 std::string Array2<T>::to_string() const{
-  if (this->_num == 0) return std::string("Unallocated Array2");
+  if (this->_num == 0) return std::string("Unallocated Array2\n");
   size_t width{0};
-  for (ind_t i=0; i<_num; ++i){
-    size_t l = my_to_string(_data[i]).size();
+  // If we loop from i=0 to i<_num we cover the *whole* array, not just the part we are viewing!
+  for (auto sub: this->subItr()){
+    auto ms = my_to_string(_data[this->s2l_d(sub)]);
+    size_t l = ms.size();
     if (l > width) width = l;
   }
   std::string out;
@@ -265,7 +268,6 @@ std::string Array2<T>::to_string() const{
       out += "["; // for i=ndim-1;
       preamble=true;
     }
-
     out += my_to_string(_data[this->s2l_d(sub)], width);
     // out += std::to_string(_data[this->s2l_d(sub)]);
     if (sub[ndim-1]+1 < _shape[ndim-1]){
@@ -383,9 +385,12 @@ Array2<T>::resize(const I ns, const T init) {
 }
 
 template<class T>
-Array2<T>&
-Array2<T>::append(const ind_t dim, const Array2<T>& extra) {
-  assert(this != &extra);
+template<class R>
+std::enable_if_t<std::is_convertible_v<R,T>, Array2<T>&>
+Array2<T>::append(const ind_t dim, const Array2<R>& extra) {
+  if constexpr (std::is_same_v<T, R>) {
+      assert(this != &extra);
+  }
   ind_t ndim = this->ndim();
   assert(dim<ndim);
   auto eshape = extra.shape();
@@ -403,7 +408,7 @@ Array2<T>::append(const ind_t dim, const Array2<T>& extra) {
     auto y = x;
     y[dim] += tshapedim; // offset by the original shape along the dimension
     // and copying the contents
-    (*this)[y] = extra[x];
+    (*this)[y] = static_cast<T>(extra[x]);
   }
   return *this;
 }
@@ -604,92 +609,92 @@ T Array2<T>::prod() const{
 
 template<class T>
 template<class R, size_t Nel>
-bool Array2<T>::match(const ind_t i, const ind_t j, const std::array<R,Nel>& rot, const int order) const {
+bool Array2<T>::match(const ind_t i, const ind_t j, const std::array<R,Nel>& rot, const int order, const T Ttol, const int tol) const {
   assert(this->ndim() == 2u); // only defined for 2-D Array2s
   assert(Nel == _shape[1]*_shape[1]);
   ind_t n = _shape[1];
   std::vector<T> tmp(n,T(0));
   for (ind_t k=0; k<n; ++k) tmp[k] = this->val(j,k);
-  brille::Comparer<T,T> eq(brille::cmp::eq);
+  polystar::Comparer<T,T> eq(polystar::cmp::eq, Ttol, Ttol, tol);
   if (order < 0){
     int o{0};
     do{
       //check against the current tmp vector whether this order rotation has moved j to i
       if (eq(n, this->ptr(i), _stride[1], tmp.data(), 1u)) return true;
       // otherwise apply the rotation (again)
-      brille::utils::mul_mat_vec_inplace(n, rot.data(), tmp.data());
+      polystar::utils::mul_mat_vec_inplace(n, rot.data(), tmp.data());
     } while (o++ < std::abs(order));
     return false;
   } else {
     // rotate exactly order times
     for (int o=0; o<order; ++o)
-      brille::utils::mul_mat_vec_inplace(n, rot.data(), tmp.data());
+      polystar::utils::mul_mat_vec_inplace(n, rot.data(), tmp.data());
     return eq(n, this->ptr(i), _stride[1], tmp.data(), 1u);
   }
 }
 
 template<class T>
-bool Array2<T>::match(const ind_t i, const ind_t j, brille::ops op, T val) const {
+bool Array2<T>::match(const ind_t i, const ind_t j, polystar::ops op, T val, const T Ttol, const int tol) const {
   auto ai= this->view(i);
   auto aj= this->view(j);
-  brille::Comparer<T,T> neq(brille::cmp::neq);
+  polystar::Comparer<T,T> neq(polystar::cmp::neq, Ttol, Ttol, tol);
   ind_t no = this->numel()/_shape[0];
   switch (op){
-    case brille::ops::plus:
+    case polystar::ops::plus:
     for (ind_t k=0; k<no; ++k) if (neq(ai[k], aj[k]+val)) return false;
     break;
-    case brille::ops::minus:
+    case polystar::ops::minus:
     for (ind_t k=0; k<no; ++k) if (neq(ai[k], aj[k]-val)) return false;
     break;
-    case brille::ops::times:
+    case polystar::ops::times:
     for (ind_t k=0; k<no; ++k) if (neq(ai[k], aj[k]*val)) return false;
     break;
-    case brille::ops::rdiv:
+    case polystar::ops::rdiv:
     for (ind_t k=0; k<no; ++k) if (neq(ai[k], aj[k]/val)) return false;
     break;
-    case brille::ops::ldiv:
+    case polystar::ops::ldiv:
     for (ind_t k=0; k<no; ++k) if (neq(ai[k], val/aj[k])) return false;
     break;
     default:
-    throw std::runtime_error(std::string("Unhandled operator ")+brille::to_string(op));
+    throw std::runtime_error(std::string("Unhandled operator ")+polystar::to_string(op));
   }
   return true;
 }
 
 template<class T>
-bool Array2<T>::all(const brille::cmp expr, const T val) const {
-  if (brille::cmp::le_ge == expr)
-    return this->all(brille::cmp::le, val) || this->all(brille::cmp::ge, val);
+bool Array2<T>::all(const polystar::cmp expr, const T val, const T Ttol, const int tol) const {
+  if (polystar::cmp::le_ge == expr)
+    return this->all(polystar::cmp::le, val) || this->all(polystar::cmp::ge, val);
   ind_t no = this->numel();
-  brille::Comparer<T,T> op(expr);
+  polystar::Comparer<T,T> op(expr, Ttol, Ttol, tol);
   for (ind_t k=0; k<no; ++k) if(!op(_data[this->l2l_d(k)], val)) return false;
   return true;
 }
 template<class T>
-bool Array2<T>::any(const brille::cmp expr, const T val) const {
-  return this->first(expr, val) < this->numel();
+bool Array2<T>::any(const polystar::cmp expr, const T val, const T Ttol, int tol) const {
+  return this->first(expr, val, Ttol, tol) < this->numel();
 }
 template<class T>
 ind_t
-Array2<T>::first(const brille::cmp expr, const T val) const {
+Array2<T>::first(const polystar::cmp expr, const T val, const T Ttol, const int tol) const {
   ind_t no = this->numel();
-  brille::Comparer<T,T> op(expr);
+  polystar::Comparer<T,T> op(expr, Ttol, Ttol, tol);
   for (ind_t k=0; k<no; ++k) if(op(_data[this->l2l_d(k)], val)) return k;
   return no;
 }
 template<class T>
 ind_t
-Array2<T>::last(const brille::cmp expr, const T val) const {
+Array2<T>::last(const polystar::cmp expr, const T val, const T Ttol, const int tol) const {
   ind_t no = this->numel();
-  brille::Comparer<T,T> op(expr);
+  polystar::Comparer<T,T> op(expr, Ttol, Ttol, tol);
   for (ind_t k=no; k--;) if(op(_data[this->l2l_d(k)], val)) return k;
   return no;
 }
 template<class T>
 ind_t
-Array2<T>::count(const brille::cmp expr, const T val) const {
+Array2<T>::count(const polystar::cmp expr, const T val, const T Ttol, const int tol) const {
   ind_t no = this->numel();
-  brille::Comparer<T,T> op(expr);
+  polystar::Comparer<T,T> op(expr, Ttol, Ttol, tol);
   ind_t cnt{0};
   for (ind_t k=0; k<no; ++k) if(op(_data[this->l2l_d(k)], val)) ++cnt;
   return cnt;
@@ -697,18 +702,18 @@ Array2<T>::count(const brille::cmp expr, const T val) const {
 
 template<class T>
 Array2<bool>
-Array2<T>::is(const brille::cmp expr, const T val) const {
+Array2<T>::is(const polystar::cmp expr, const T val, const T Ttol, const int tol) const {
   Array2<bool> out(_shape, _stride, true);
   ind_t no = this->numel();
-  brille::Comparer<T,T> op(expr);
+  polystar::Comparer<T,T> op(expr, Ttol, Ttol, tol);
   for (ind_t k=0; k<no; ++k) out[k] = op(_data[this->l2l_d(k)], val);
   return out;
 }
 
 template<class T>
 std::vector<ind_t>
-Array2<T>::find(const brille::cmp expr, const T val) const {
-  Array2<bool> this_is = this->is(expr, val);
+Array2<T>::find(const polystar::cmp expr, const T val, const T Ttol, const int tol) const {
+  Array2<bool> this_is = this->is(expr, val, Ttol, tol);
   ind_t no = this->numel();
   std::vector<ind_t> out;
   for (ind_t k=0; k<no; ++k) if (this_is[k]) out.push_back(k);
@@ -718,7 +723,7 @@ Array2<T>::find(const brille::cmp expr, const T val) const {
 template<class T>
 template<class R>
 Array2<bool>
-Array2<T>::is(const brille::cmp expr, const Array2<R>& that) const {
+Array2<T>::is(const polystar::cmp expr, const Array2<R>& that, const T Ttol, const R Rtol, const int tol) const {
   // To handle singleton-dimension broadcasting, this function needs to be split
   auto tsize = that.shape();
   if (!std::equal(_shape.begin(), _shape.end(), tsize.begin(),
@@ -733,7 +738,7 @@ Array2<T>::is(const brille::cmp expr, const Array2<R>& that) const {
   Array2<bool> out(_shape, _stride, true);
   if (std::equal(_shape.begin(), _shape.end(), tsize.begin())){
     // No broadcast
-    brille::Comparer<T,R> op(expr);
+    polystar::Comparer<T,R> op(expr, Ttol, Rtol, tol);
     // no guarantees about same stride, so use subscript iterator:
     for (auto sub: this->subItr()) out[sub] = op(_data[this->s2l_d(sub)], that[sub]);
   } else {
@@ -742,7 +747,7 @@ Array2<T>::is(const brille::cmp expr, const Array2<R>& that) const {
     for (ind_t i=1; i<ndim; ++i) if (_shape[i]!=tsize[i])
       throw std::runtime_error("Broadcasting beyond the first dimension requires viewing beyond the first dimension!");
     for (ind_t i=0; i<_shape[0]; ++i)
-      out.set(i, this->view(i).is(expr, that));
+      out.set(i, this->view(i).is(expr, that, Ttol, Rtol, tol));
   }
   return out;
 }
@@ -750,10 +755,10 @@ Array2<T>::is(const brille::cmp expr, const Array2<R>& that) const {
 template<class T>
 template<class R>
 std::vector<bool>
-Array2<T>::row_is(const brille::cmp expr, const std::vector<R>& row) const{
+Array2<T>::row_is(const polystar::cmp expr, const std::vector<R>& row, const T Ttol, const R Rtol, const int tol) const{
   assert(row.size() == _shape[1]);
   std::vector<bool> out;
-  brille::Comparer<T,R> op(expr);
+  polystar::Comparer<T,R> op(expr, Ttol, Rtol, tol);
   out.reserve(_shape[0]);
   // loop over rows, comparing each row to the input values (a std::vector has stride of 1)
   for (ind_t i=0; i<_shape[0]; ++i)
@@ -763,7 +768,7 @@ Array2<T>::row_is(const brille::cmp expr, const std::vector<R>& row) const{
 
 template<class T>
 template<class R>
-Array2<bool> Array2<T>::row_is(const brille::cmp expr, const Array2<R>& rows) const {
+Array2<bool> Array2<T>::row_is(const polystar::cmp expr, const Array2<R>& rows, const T Ttol, const R Rtol, const int tol) const {
   // To handle singleton-dimension broadcasting, this function needs to be split
   auto r_shape = rows.shape();
   if (!std::equal(_shape.begin(), _shape.end(), r_shape.begin(), [](ind_t a, ind_t b){return 1 == b || a == b;})){
@@ -774,26 +779,42 @@ Array2<bool> Array2<T>::row_is(const brille::cmp expr, const Array2<R>& rows) co
     msg += ").";
     throw std::runtime_error(msg);
   }
-  Array2<bool> out(_shape[0], true);
+  Array2<bool> out(_shape[0], true); // we only support singleton 'rows' not 'this'
+  polystar::Comparer<T,R> op(expr, Ttol, Rtol, tol);
+  auto r_stride = rows.stride();
+
   if (std::equal(_shape.begin(), _shape.end(), r_shape.begin())){
     // No broadcast
-    brille::Comparer<T,R> op(expr);
-    auto r_stride = rows.stride();
     for (ind_t i=0; i<_shape[0]; ++i)
       out[i] = op(_shape[1], this->ptr(i), _stride[1], rows.ptr(i), r_stride[1]);
   } else {
     // Broadcast
     for (ind_t i=1; i<_shape.size(); ++i) if (_shape[i] != r_shape[i])
         throw std::runtime_error("Broadcasting beyond the first dimension requires viewing beyond the first dimension!");
+    auto r_ptr = rows.ptr(0);
     for (ind_t i=0; i<_shape[0]; ++i)
-      out.set(i, this->view(i).row_is(expr, rows));
+      out[i] = op(_shape[1], this->ptr(i), _stride[1], r_ptr, r_stride[1]);
   }
+
+//  if (std::equal(_shape.begin(), _shape.end(), r_shape.begin())){
+//    // No broadcast
+//    polystar::Comparer<T,R> op(expr, Ttol, Rtol, tol);
+//    auto r_stride = rows.stride();
+//    for (ind_t i=0; i<_shape[0]; ++i)
+//      out[i] = op(_shape[1], this->ptr(i), _stride[1], rows.ptr(i), r_stride[1]);
+//  } else {
+//    // Broadcast
+//    for (ind_t i=1; i<_shape.size(); ++i) if (_shape[i] != r_shape[i])
+//        throw std::runtime_error("Broadcasting beyond the first dimension requires viewing beyond the first dimension!");
+//    for (ind_t i=0; i<_shape[0]; ++i)
+//      out.set(i, this->view(i).row_is(expr, rows, Ttol, Rtol, tol));
+//  }
   return out;
 }
 
 template<class T>
 template<class R>
-ind_t Array2<T>::first(const brille::cmp expr, const Array2<R>& rows) const {
+ind_t Array2<T>::first(const polystar::cmp expr, const Array2<R>& rows, const T Ttol, const R Rtol, const int tol) const {
   // To handle singleton-dimension broadcasting, this function needs to be split
   auto r_shape = rows.shape();
   if (!std::equal(_shape.begin(), _shape.end(), r_shape.begin(), [](ind_t a, ind_t b){return 1 == b || a == b;})){
@@ -806,20 +827,20 @@ ind_t Array2<T>::first(const brille::cmp expr, const Array2<R>& rows) const {
   }
   if (std::equal(_shape.begin(), _shape.end(), r_shape.begin())){
     // No broadcast
-    brille::Comparer<T,R> op(expr);
+    polystar::Comparer<T,R> op(expr, Ttol, Rtol, tol);
     auto r_stride = rows.stride();
     for (ind_t i=0; i<_shape[0]; ++i) if (op(_shape[1], this->ptr(i), _stride[1], rows.ptr(i), r_stride[1])) return i;
   } else {
     // Broadcast
     for (ind_t i=1; i<_shape.size(); ++i) if (_shape[i] != r_shape[i])
         throw std::runtime_error("Broadcasting beyond the first dimension requires viewing beyond the first dimension!");
-    for (ind_t i=0; i<_shape[0]; ++i) if (this->view(i).row_is(expr, rows).all()) return i;
+    for (ind_t i=0; i<_shape[0]; ++i) if (this->view(i).row_is(expr, rows, Ttol, Rtol, tol).all()) return i;
   }
   return _shape[0];
 }
 template<class T>
 template<class R>
-ind_t Array2<T>::last(const brille::cmp expr, const Array2<R>& rows) const {
+ind_t Array2<T>::last(const polystar::cmp expr, const Array2<R>& rows, const T Ttol, const R Rtol, const int tol) const {
   // To handle singleton-dimension broadcasting, this function needs to be split
   auto r_shape = rows.shape();
   if (!std::equal(_shape.begin(), _shape.end(), r_shape.begin(), [](ind_t a, ind_t b){return 1 == b || a == b;})){
@@ -832,20 +853,20 @@ ind_t Array2<T>::last(const brille::cmp expr, const Array2<R>& rows) const {
   }
   if (std::equal(_shape.begin(), _shape.end(), r_shape.begin())){
     // No broadcast
-    brille::Comparer<T,R> op(expr);
+    polystar::Comparer<T,R> op(expr, Ttol, Rtol, tol);
     auto r_stride = rows.stride();
     for (ind_t i=_shape[0]; i--;) if (op(_shape[1], this->ptr(i), _stride[1], rows.ptr(i), r_stride[1])) return i;
   } else {
     // Broadcast
     for (ind_t i=1; i<_shape.size(); ++i) if (_shape[i] != r_shape[i])
         throw std::runtime_error("Broadcasting beyond the first dimension requires viewing beyond the first dimension!");
-    for (ind_t i=_shape[0]; i--;) if (this->view(i).row_is(expr, rows).all()) return i;
+    for (ind_t i=_shape[0]; i--;) if (this->view(i).row_is(expr, rows, Ttol, Rtol, tol).all()) return i;
   }
   return _shape[0];
 }
 template<class T>
 template<class R>
-ind_t Array2<T>::count(const brille::cmp expr, const Array2<R>& rows) const {
+ind_t Array2<T>::count(const polystar::cmp expr, const Array2<R>& rows, const T Ttol, const R Rtol, const int tol) const {
   // To handle singleton-dimension broadcasting, this function needs to be split
   auto r_shape = rows.shape();
   if (!std::equal(_shape.begin(), _shape.end(), r_shape.begin(), [](ind_t a, ind_t b){return 1 == b || a == b;})){
@@ -859,20 +880,20 @@ ind_t Array2<T>::count(const brille::cmp expr, const Array2<R>& rows) const {
   ind_t number{0};
   if (std::equal(_shape.begin(), _shape.end(), r_shape.begin())){
     // No broadcast
-    brille::Comparer<T,R> op(expr);
+    polystar::Comparer<T,R> op(expr, Ttol, Rtol, tol);
     auto r_stride = rows.stride();
     for (ind_t i=0; i<_shape[0]; ++i) if (op(_shape[1], this->ptr(i), _stride[1], rows.ptr(i), r_stride[1])) ++number;
   } else {
     // Broadcast
     for (ind_t i=1; i<_shape.size(); ++i) if (_shape[i] != r_shape[i])
         throw std::runtime_error("Broadcasting beyond the first dimension requires viewing beyond the first dimension!");
-    for (ind_t i=0; i<_shape[0]; ++i) if (this->view(i).row_is(expr, rows).all()) ++number;
+    for (ind_t i=0; i<_shape[0]; ++i) if (this->view(i).row_is(expr, rows, Ttol, Rtol, tol).all()) ++number;
   }
   return number;
 }
 template<class T>
 template<class R>
-std::vector<ind_t> Array2<T>::find(const brille::cmp expr, const Array2<R>& rows) const {
+std::vector<ind_t> Array2<T>::find(const polystar::cmp expr, const Array2<R>& rows, const T Ttol, const R Rtol, const int tol) const {
   // To handle singleton-dimension broadcasting, this function needs to be split
   auto r_shape = rows.shape();
   if (!std::equal(_shape.begin(), _shape.end(), r_shape.begin(), [](ind_t a, ind_t b){return 1 == b || a == b;})){
@@ -886,14 +907,14 @@ std::vector<ind_t> Array2<T>::find(const brille::cmp expr, const Array2<R>& rows
   std::vector<ind_t> out;
   if (std::equal(_shape.begin(), _shape.end(), r_shape.begin())){
     // No broadcast
-    brille::Comparer<T,R> op(expr);
+    polystar::Comparer<T,R> op(expr, Ttol, Rtol, tol);
     auto r_stride = rows.stride();
     for (ind_t i=0; i<_shape[0]; ++i) if (op(_shape[1], this->ptr(i), _stride[1], rows.ptr(i), r_stride[1])) out.push_back(i);
   } else {
     // Broadcast
     for (ind_t i=1; i<_shape.size(); ++i) if (_shape[i] != r_shape[i])
         throw std::runtime_error("Broadcasting beyond the first dimension requires viewing beyond the first dimension!");
-    for (ind_t i=0; i<_shape[0]; ++i) if (this->view(i).row_is(expr, rows).all()) out.push_back(i);
+    for (ind_t i=0; i<_shape[0]; ++i) if (this->view(i).row_is(expr, rows, Ttol, Rtol, tol).all()) out.push_back(i);
   }
   return out;
 }
@@ -901,11 +922,11 @@ std::vector<ind_t> Array2<T>::find(const brille::cmp expr, const Array2<R>& rows
 template<class T>
 template<class R>
 std::vector<bool>
-Array2<T>::each_is(const brille::cmp expr, const std::vector<R>& vals) const{
+Array2<T>::each_is(const polystar::cmp expr, const std::vector<R>& vals, const T Ttol, const R Rtol, const int tol) const{
   auto no = this->numel();
   assert(vals.size() == no);
   std::vector<bool> out;
-  brille::Comparer<T,R> op(expr);
+  polystar::Comparer<T,R> op(expr, Ttol, Rtol, tol);
   out.reserve(no);
   // loop over whole array in linear-index order
   for (ind_t i=0; i<no; ++i)
@@ -915,17 +936,17 @@ Array2<T>::each_is(const brille::cmp expr, const std::vector<R>& vals) const{
 
 template<class T>
 template<class R>
-bool Array2<T>::is(const Array2<R>& that) const {
-  return this->is(brille::cmp::eq, that).all(true);
+bool Array2<T>::is(const Array2<R>& that, const T Ttol, const R Rtol, const int tol) const {
+  return this->is(polystar::cmp::eq, that, Ttol, Rtol, tol).all(true);
 }
 
 template<class T>
 std::vector<bool>
-Array2<T>::is_unique() const{
+Array2<T>::is_unique(const T Ttol, const int tol) const{
   if (_shape[0] < 1u) return std::vector<bool>();
   std::vector<bool> out(1u, true);
   out.reserve(_shape[0]);
-  brille::Comparer<T,T> op(brille::cmp::neq);
+  polystar::Comparer<T,T> op(polystar::cmp::neq, Ttol, Ttol, tol);
   ind_t sz{_shape[1]}, st{_stride[1]};
   for (ind_t i=1; i<_shape[0]; ++i){
     bool isu{true};
@@ -939,11 +960,11 @@ Array2<T>::is_unique() const{
 }
 template<class T>
 std::vector<ind_t>
-Array2<T>::unique_idx() const{
+Array2<T>::unique_idx(const T Ttol, const int tol) const{
   if (_shape[0] < 1u) return std::vector<ind_t>();
   std::vector<ind_t> out(1u, 0u);
   out.reserve(_shape[0]);
-  brille::Comparer<T,T> op(brille::cmp::eq);
+  polystar::Comparer<T,T> op(polystar::cmp::eq, Ttol, Ttol, tol);
   ind_t sz{_shape[1]}, st{_stride[1]};
   for (ind_t i=1; i<_shape[0]; ++i){
     ind_t idx{i};
@@ -958,8 +979,8 @@ Array2<T>::unique_idx() const{
 }
 template<class T>
 Array2<T>
-Array2<T>::unique() const {
-  std::vector<bool> isu = this->is_unique();
+Array2<T>::unique(const T Ttol, const int tol) const {
+  std::vector<bool> isu = this->is_unique(Ttol, tol);
   size_t u_count = std::count(isu.begin(), isu.end(), true);
   shape_t osize{_shape};
   osize[0] = static_cast<ind_t>(u_count);
@@ -973,7 +994,7 @@ T Array2<T>::dot(ind_t i, ind_t j) const {
   assert(j<_shape[0]);
   ind_t sz{_shape[1]}, st{_stride[1]};
   std::vector<T> prods(sz,0);
-  brille::RawBinaryOperator<T> prod(brille::ops::times);
+  polystar::RawBinaryOperator<T> prod(polystar::ops::times);
   // perform elementwise multiplication on the views of i and j
   prod(sz, prods.data(), 1u, this->ptr(i), st, this->ptr(j), st);
   // find the sum of the products
@@ -1017,14 +1038,18 @@ void Array2<T>::permute(std::vector<I>& p){
 
 template<class T>
 template<class R>
-bool Array2<T>::is_permutation(const Array2<R>& other) const{
+bool Array2<T>::is_permutation(const Array2<R>& other, const T Ttol, const R Rtol, int tol) const{
   auto osh = other.shape();
   for (ind_t i=0; i < ndim(); ++i) if (osh[i] != _shape[i]) return false;
   for (ind_t i=0; i < _shape[0]; ++i){
     const auto x{this->view(i)};
     // if *this contains the same thing more than once, other must as well:
     // NaN values would break this functionality since NaN == NaN is never true
-    if (this->count(cmp::eq, x) != other.count(cmp::eq, x)) return false;
+    if (this->count(cmp::eq, x) != other.count(cmp::eq, x, Ttol, Rtol, tol)) {
+      info_update(x.to_string(0), " is in \n", this->to_string(), this->count(cmp::eq, x), " times but in\n",
+                  other.to_string(), other.count(cmp::eq, x, tol), " times!");
+      return false;
+    }
 //    // the reverse should be true too, but is extraneous
 //    const auto y{other.view(i)};
 //    if (this->count(cmp::eq, y) != other.count(cmp::eq, y)) return false;
@@ -1035,7 +1060,7 @@ bool Array2<T>::is_permutation(const Array2<R>& other) const{
 
 template<class T>
 template<class R>
-std::vector<ind_t> Array2<T>::permutation_vector(const Array2<R>& other) const {
+std::vector<ind_t> Array2<T>::permutation_vector(const Array2<R>& other, const T Ttol, const R Rtol, int tol) const {
   auto not_present = [](const auto & a, const auto & b){
     if (a.size() == 0) throw std::runtime_error("Can not find a not in b since a is empty");
     if (b.size() == 0) return a[0];
@@ -1047,7 +1072,7 @@ std::vector<ind_t> Array2<T>::permutation_vector(const Array2<R>& other) const {
   };
   std::vector<ind_t> perm;
   for (ind_t i=0; i < _shape[0]; ++i){
-    auto others = other.find(cmp::eq, this->view(i));
+    auto others = other.find(cmp::eq, this->view(i), Ttol, Rtol, tol);
     perm.push_back(not_present(others, perm));
   }
   return perm;
@@ -1277,6 +1302,13 @@ SCALAR_INPLACE_OP(/=)
 //   for (auto& v: this->valItr()) v /= val;
 //   return *this;
 // }
+
+template<class T>
+Array2<T> Array2<T>::operator^(const T& val){
+  Array2<T> out(this->shape());
+  for (auto & v: this->subItr()) out[v] = std::pow(this->operator[](v), val);
+  return out;
+}
 
 /*! \brief Verify that two Array2 shapes can be broadcast together
 

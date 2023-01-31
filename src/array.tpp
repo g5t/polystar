@@ -1,19 +1,19 @@
-/* This file is part of brille.
+/* This file is part of polystar.
 
 Copyright © 2020 Greg Tucker <greg.tucker@stfc.ac.uk>
 
-brille is free software: you can redistribute it and/or modify it under the
+polystar is free software: you can redistribute it and/or modify it under the
 terms of the GNU Affero General Public License as published by the Free
 Software Foundation, either version 3 of the License, or (at your option)
 any later version.
 
-brille is distributed in the hope that it will be useful, but
+polystar is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
 or FITNESS FOR A PARTICULAR PURPOSE.
 See the GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with brille. If not, see <https://www.gnu.org/licenses/>.            */
+along with polystar. If not, see <https://www.gnu.org/licenses/>.            */
 
 template<class T>
 Array<T> Array<T>::view() const{
@@ -117,8 +117,8 @@ Array<T>::extract(const std::vector<std::array<I,Nel>>& i) const
   for (auto a: i) for (auto x: a) if (!(0 <= x && static_cast<ind_t>(x) < _shape[0]))
     throw std::runtime_error("Array extract index must be in range");
   shape_t osh{static_cast<ind_t>(i.size()), static_cast<ind_t>(Nel)};
-  for (ind_t i=1; i<this->ndim(); ++i)
-    osh.push_back(_shape[i]);
+  for (ind_t j=1; j<this->ndim(); ++j)
+    osh.push_back(_shape[j]);
   Array<T> out(osh);
   shape_t xi{_shape};
   for (ind_t a=0; a<i.size(); ++a)
@@ -646,86 +646,86 @@ bool Array<T>::match(const ind_t i, const ind_t j, const std::array<R,Nel>& rot,
   auto aj=this->view(j);
   std::vector<T> tmp(n,T(0));
   for (ind_t k=0; k<n; ++k) tmp[k] = aj[k];
-  brille::Comparer<T,T> eq(brille::cmp::eq);
+  polystar::Comparer<T,T> eq(polystar::cmp::eq);
   if (order < 0){
     int o{0};
     do{
       //check against the current tmp vector whether this order rotation has moved j to i
       if (eq(n, ai.data(), tmp.data())) return true;
       // otherwise apply the rotation (again)
-      brille::utils::mul_mat_vec_inplace(n, rot.data(), tmp.data());
+      polystar::utils::mul_mat_vec_inplace(n, rot.data(), tmp.data());
     } while (o++ < std::abs(order));
     return false;
   } else {
     // rotate exactly order times
     for (int o=0; o<order; ++o)
-      brille::utils::mul_mat_vec_inplace(n, rot.data(), tmp.data());
+      polystar::utils::mul_mat_vec_inplace(n, rot.data(), tmp.data());
     return eq(n, ai.data(), tmp.data());
   }
 }
 
 template<class T>
-bool Array<T>::match(const ind_t i, const ind_t j, brille::ops op, T val) const {
+bool Array<T>::match(const ind_t i, const ind_t j, polystar::ops op, T val) const {
   auto ai= this->view(i);
   auto aj= this->view(j);
-  brille::Comparer<T,T> neq(brille::cmp::neq);
+  polystar::Comparer<T,T> neq(polystar::cmp::neq);
   ind_t no = this->numel()/_shape[0];
   switch (op){
-    case brille::ops::plus:
+    case polystar::ops::plus:
     for (ind_t k=0; k<no; ++k) if (neq(ai[k], aj[k]+val)) return false;
     break;
-    case brille::ops::minus:
+    case polystar::ops::minus:
     for (ind_t k=0; k<no; ++k) if (neq(ai[k], aj[k]-val)) return false;
     break;
-    case brille::ops::times:
+    case polystar::ops::times:
     for (ind_t k=0; k<no; ++k) if (neq(ai[k], aj[k]*val)) return false;
     break;
-    case brille::ops::rdiv:
+    case polystar::ops::rdiv:
     for (ind_t k=0; k<no; ++k) if (neq(ai[k], aj[k]/val)) return false;
     break;
-    case brille::ops::ldiv:
+    case polystar::ops::ldiv:
     for (ind_t k=0; k<no; ++k) if (neq(ai[k], val/aj[k])) return false;
     break;
     default:
-    throw std::runtime_error(std::string("Unhandled operator ")+brille::to_string(op));
+    throw std::runtime_error(std::string("Unhandled operator ")+polystar::to_string(op));
   }
   return true;
 }
 
 template<class T>
-bool Array<T>::all(const brille::cmp expr, const T val) const {
-  if (brille::cmp::le_ge == expr)
-    return this->all(brille::cmp::le, val) || this->all(brille::cmp::ge, val);
+bool Array<T>::all(const polystar::cmp expr, const T val) const {
+  if (polystar::cmp::le_ge == expr)
+    return this->all(polystar::cmp::le, val) || this->all(polystar::cmp::ge, val);
   ind_t no = this->numel();
-  brille::Comparer<T,T> op(expr);
+  polystar::Comparer<T,T> op(expr);
   for (ind_t k=0; k<no; ++k) if(!op(_data[this->l2l_d(k)], val)) return false;
   return true;
 }
 template<class T>
-bool Array<T>::any(const brille::cmp expr, const T val) const {
+bool Array<T>::any(const polystar::cmp expr, const T val) const {
   return this->first(expr, val) < this->numel();
 }
 template<class T>
 ind_t
-Array<T>::first(const brille::cmp expr, const T val) const {
+Array<T>::first(const polystar::cmp expr, const T val) const {
   ind_t no = this->numel();
-  brille::Comparer<T,T> op(expr);
+  polystar::Comparer<T,T> op(expr);
   for (ind_t k=0; k<no; ++k) if(op(_data[this->l2l_d(k)], val)) return k;
   return no;
 }
 template<class T>
 ind_t
-Array<T>::last(const brille::cmp expr, const T val) const {
+Array<T>::last(const polystar::cmp expr, const T val) const {
   ind_t no = this->numel();
-  brille::Comparer<T,T> op(expr);
+  polystar::Comparer<T,T> op(expr);
   for (ind_t k=no; k--;) if(op(_data[this->l2l_d(k)], val)) return k;
   return no;
 }
 template<class T>
 ind_t
-Array<T>::count(const brille::cmp expr, const T val) const {
+Array<T>::count(const polystar::cmp expr, const T val) const {
   ind_t no = this->numel();
-  brille::Comparer<T,T> op(expr);
+  polystar::Comparer<T,T> op(expr);
   ind_t cnt{0};
   for (ind_t k=0; k<no; ++k) if(op(_data[this->l2l_d(k)], val)) ++cnt;
   return cnt;
@@ -733,17 +733,17 @@ Array<T>::count(const brille::cmp expr, const T val) const {
 
 template<class T>
 Array<bool>
-Array<T>::is(const brille::cmp expr, const T val) const {
+Array<T>::is(const polystar::cmp expr, const T val) const {
   Array<bool> out(_shape, _stride, true);
   ind_t no = this->numel();
-  brille::Comparer<T,T> op(expr);
+  polystar::Comparer<T,T> op(expr);
   for (ind_t k=0; k<no; ++k) out[k] = op(_data[this->l2l_d(k)], val);
   return out;
 }
 
 template<class T>
 std::vector<ind_t>
-Array<T>::find(const brille::cmp expr, const T val) const {
+Array<T>::find(const polystar::cmp expr, const T val) const {
   Array<bool> this_is = this->is(expr, val);
   ind_t no = this->numel();
   std::vector<ind_t> out;
@@ -753,7 +753,7 @@ Array<T>::find(const brille::cmp expr, const T val) const {
 
 template<class T> template<class R>
 Array<bool>
-Array<T>::is(const brille::cmp expr, const Array<R>& that) const {
+Array<T>::is(const polystar::cmp expr, const Array<R>& that) const {
   // To handle singleton-dimension broadcasting, this function needs to be split
   auto tsize = that.shape();
   if (!std::equal(_shape.begin(), _shape.end(), tsize.begin(),
@@ -769,7 +769,7 @@ Array<T>::is(const brille::cmp expr, const Array<R>& that) const {
   size_t ndim = _shape.size();
   if (std::equal(_shape.begin(), _shape.end(), tsize.begin())){
     // No broadcast
-    brille::Comparer<T,R> op(expr);
+    polystar::Comparer<T,R> op(expr);
     // no guarantees about same stride, so use subscript iterator:
     for (auto sub: SubIt<ind_t>(_shape))
       out[sub] = op(_data[this->s2l_d(sub)], that[sub]);
@@ -785,12 +785,12 @@ Array<T>::is(const brille::cmp expr, const Array<R>& that) const {
 
 template<class T> template<class R>
 std::vector<bool>
-Array<T>::is(const brille::cmp expr, const std::vector<R>& val) const{
+Array<T>::is(const polystar::cmp expr, const std::vector<R>& val) const{
   assert(2==this->ndim());
   assert(val.size() == _shape[1]);
   std::vector<bool> out;
   out.reserve(_shape[0]);
-  brille::Comparer<T,R> op(expr);
+  polystar::Comparer<T,R> op(expr);
   for (ind_t i=0; i<_shape[0]; ++i)
     out.push_back(op(_shape[1], this->ptr(i), _stride[1], val.data(), 1u));
   return out;
@@ -798,7 +798,7 @@ Array<T>::is(const brille::cmp expr, const std::vector<R>& val) const{
 
 template<class T> template<class R>
 bool Array<T>::is(const Array<R>& that) const {
-  return this->is(brille::cmp::eq, that).all(true);
+  return this->is(polystar::cmp::eq, that).all(true);
 }
 
 template<class T>
@@ -808,7 +808,7 @@ Array<T>::is_unique() const{
   if (_shape[0] < 1u) return std::vector<bool>();
   std::vector<bool> out(1u, true);
   out.reserve(_shape[0]);
-  brille::Comparer<T,T> op(brille::cmp::neq);
+  polystar::Comparer<T,T> op(polystar::cmp::neq);
   ind_t sz{_shape[1]}, st{_stride[1]};
   for (ind_t i=1; i<_shape[0]; ++i){
     bool isu{true};
@@ -827,7 +827,7 @@ Array<T>::unique_idx() const{
   if (_shape[0] < 1u) return std::vector<ind_t>();
   std::vector<ind_t> out(1u, 0u);
   out.reserve(_shape[0]);
-  brille::Comparer<T,T> op(brille::cmp::eq);
+  polystar::Comparer<T,T> op(polystar::cmp::eq);
   ind_t sz{_shape[1]}, st{_stride[1]};
   for (ind_t i=1; i<_shape[0]; ++i){
     ind_t idx{i};
@@ -858,7 +858,7 @@ T Array<T>::dot(ind_t i, ind_t j) const {
   assert(j<_shape[0]);
   ind_t sz{_shape[1]}, st{_stride[1]};
   std::vector<T> prods(sz,0);
-  brille::RawBinaryOperator<T> prod(brille::ops::times);
+  polystar::RawBinaryOperator<T> prod(polystar::ops::times);
   // perform elementwise multiplication on the views of i and j
   prod(sz, prods.data(), 1u, this->ptr(i), st, this->ptr(j), st);
   // find the sum of the products
@@ -958,7 +958,7 @@ template<class ... Subs, class>
 T* Array<T>::ptr(const ind_t i0, Subs... subscripts){
   const size_t nsub = 1+sizeof...(Subs);
   if (nsub != this->ndim()) throw std::runtime_error("Wrong number of subscripts for value access");
-  return this->ptr(brille::utils::make_vector(i0, subscripts...));
+  return this->ptr(polystar::utils::make_vector(i0, subscripts...));
 }
 template<class T>
 T* Array<T>::ptr(const shape_t& p){
@@ -986,7 +986,7 @@ template<class ... Subs, class>
 const T* Array<T>::ptr(const ind_t i0, Subs... subscripts) const {
   const size_t nsub = 1+sizeof...(Subs);
   if (nsub != this->ndim()) throw std::runtime_error("Wrong number of subscripts for value access");
-  return this->ptr(brille::utils::make_vector(i0, subscripts...));
+  return this->ptr(polystar::utils::make_vector(i0, subscripts...));
 }
 template<class T>
 const T* Array<T>::ptr(const shape_t& p) const {
@@ -1010,7 +1010,7 @@ template<class ... Subs, class>
 T& Array<T>::val(const ind_t i0, Subs... subscripts){
   const size_t nsub = 1+sizeof...(Subs);
   if (nsub != this->ndim()) throw std::runtime_error("Wrong number of subscripts for value access");
-  return this->val(brille::utils::make_vector(i0, subscripts...));
+  return this->val(polystar::utils::make_vector(i0, subscripts...));
 }
 template<class T>
 T& Array<T>::val(const shape_t& p){
@@ -1039,7 +1039,7 @@ template<class ... Subs, class>
 const T& Array<T>::val(const ind_t i0, Subs... subscripts) const {
   const size_t nsub = 1+sizeof...(Subs);
   if (nsub != this->ndim()) throw std::runtime_error("Wrong number of subscripts for value access");
-  return this->val(brille::utils::make_vector(i0, subscripts...));
+  return this->val(polystar::utils::make_vector(i0, subscripts...));
 }
 template<class T>
 const T& Array<T>::val(const shape_t& p) const {
@@ -1189,9 +1189,9 @@ Array<T> Array<T>::slice(const ind_t i) const {
     ind_t n_shift{_shift + i*_stride[0]};
     // pull together the remaining dimension(s)
     shape_t n_str, n_shp;
-    for (ind_t i=1; i<_shape.size(); ++i){
-      n_str.push_back(_stride[i]);
-      n_shp.push_back(_shape[i]);
+    for (ind_t j=1; j<_shape.size(); ++j){
+      n_str.push_back(_stride[j]);
+      n_shp.push_back(_shape[j]);
     }
     // ensuring that we keep at least one
     if (n_shp.size() < 1){
@@ -1230,7 +1230,7 @@ SCALAR_INPLACE_OP(/=)
 template<class T>
 bool broadcast_shape_check(const std::vector<T>& a, const std::vector<T>&b){
   bool ok = a.size() == b.size();
-  ok &= brille::approx::vector(a.size(), a.data(), b.data());
+  ok &= polystar::approx_float::vector(a.size(), a.data(), b.data());
   if (!ok){
     std::string msg = "In place broadcasting is not possible for { ";
     for (auto x: a) msg += std::to_string(x) + " ";

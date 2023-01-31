@@ -1,37 +1,36 @@
 # Copyright © 2019,2020 Greg Tucker <greg.tucker@stfc.ac.uk>
 #
-# This file is part of brille.
+# This file is part of polystar.
 #
-# brille is free software: you can redistribute it and/or modify it under the
+# polystar is free software: you can redistribute it and/or modify it under the
 # terms of the GNU Affero General Public License as published by the Free
 # Software Foundation, either version 3 of the License, or (at your option)
 # any later version.
 #
-# brille is distributed in the hope that it will be useful, but
+# polystar is distributed in the hope that it will be useful, but
 # WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
 # or FITNESS FOR A PARTICULAR PURPOSE.
 #
 # See the GNU Affero General Public License for more details.
 # You should have received a copy of the GNU Affero General Public License
-# along with brille. If not, see <https://www.gnu.org/licenses/>.
+# along with polystar. If not, see <https://www.gnu.org/licenses/>.
 
 """
-Plotting utilities for ``brille``
+Plotting utilities for ``polystar``
 ---------------------------------
 
-.. currentmodule:: brille.plotting
+.. currentmodule:: polystar.plotting
 
 .. autosummary::
     :toctree: _generate
 """
 
-import collections
 import numpy as np
 import matplotlib.pyplot as pp
 from mpl_toolkits.mplot3d.axes3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
-from matplotlib.colors import get_named_colors_mapping
-import polystar
+
+
 
 def _check_axes(axs=None):
     if axs is None:
@@ -39,7 +38,9 @@ def _check_axes(axs=None):
             axs = pp.gca()
         else:
             axs = Axes3D(pp.figure())
+        pp.gcf().add_axes(axs)
     return axs
+
 
 def plot(*args, **kwds):
     """A gateway plotting function which infers intention from its input.
@@ -73,8 +74,9 @@ def plot(*args, **kwds):
         If the specialisation can not be inferred from ``*args`` then an
         exception is raised.
     """
+    from .bound import Polyhedron
     if len(args) == 1:
-        if isinstance(args[0], polystar.Polyhedron):
+        if isinstance(args[0], Polyhedron):
             return plot_polyhedron(*args, **kwds)
         else:
             return plot_points(*args, **kwds)
@@ -111,7 +113,7 @@ def plot_points(x, axs=None, title=None, show=True):
         axs.set_title(title)
     if show:
         pp.show()
-    return axs
+
 
 def plot_points_with_lines(x, y, axs=None, title=None, show=True):
     """Plot points with lines.
@@ -144,7 +146,6 @@ def plot_points_with_lines(x, y, axs=None, title=None, show=True):
         axs.set_title(title)
     if show:
         pp.show()
-    return axs
 
 
 def _make_poly_collection(verts, vpf, origin=None, color='b', edgecolor='k',
@@ -171,6 +172,7 @@ def _make_poly_collection(verts, vpf, origin=None, color='b', edgecolor='k',
     collection.set_facecolor(color)
     return (collection, xyz_min, xyz_max)
 
+
 def __cube(p_0, p_1):
     """Return the patches of a cube bounded by points p_0 and p_1."""
     d_x = np.array((p_1[0]-p_0[0], 0, 0))
@@ -193,15 +195,16 @@ def __cube(p_0, p_1):
     patches = [verts[x] for x in idx]
     return patches
 
+
 def plot_polyhedron(poly, axs=None, setlims=True, show=True, **kwds):
     """Plot a single polyhedron.
 
     Parameters
     ----------
-    poly : :py:class:`brille._brille.Polyhedron`
+    poly : :py:class:`polystar._polystar.Polyhedron`
         Any object with both a ``vertices`` and ``vertices_per_face`` field
         could work with thie plotting function, however it is anticipated that a
-        :py:class:`brille._brille.Polyhedron` will be provided.
+        :py:class:`polystar._polystar.Polyhedron` will be provided.
 
     axs : :py:class:`matplotlib.axes.Axes`, optional
         The 3D axes in which to add the polyhedron facets. If ``None`` then
@@ -247,7 +250,7 @@ def plot_polyhedron(poly, axs=None, setlims=True, show=True, **kwds):
     axs = _check_axes(axs)
     # the 1st Brillouin zone has on-face points equal to half the normals
     coll, xyz_min, xyz_max = _make_poly_collection(poly.vertices,
-                                                   poly.vertices_per_face,
+                                                   poly.faces,
                                                    **kwds)
     axs.add_collection3d(coll)
     if setlims:
@@ -257,6 +260,7 @@ def plot_polyhedron(poly, axs=None, setlims=True, show=True, **kwds):
     if show:
         pp.show()
     return axs
+
 
 def plot_tetrahedron(verts, axs=None, show=True, **kwds):
     """Plot a single tetrahedron.
@@ -312,6 +316,7 @@ def plot_tetrahedron(verts, axs=None, show=True, **kwds):
         pp.show()
     return axs
 
+
 def plot_tetrahedra(allverts, tetidx, axs=None, **kwds):
     """Plot a number of tetrahedra.
 
@@ -354,10 +359,14 @@ def plot_tetrahedra(allverts, tetidx, axs=None, **kwds):
     for tet, colour in zip(tetidx, colours):
         plot_tetrahedron(allverts[tet], color=colour, **kwds)
 
+
 def make_colours(n, color=None, **kwds):
     if color is None:
+        from matplotlib.colors import get_named_colors_mapping
         color = get_named_colors_mapping().keys()
-    if isinstance(color, collections.Iterable):
+
+    from collections.abc import Iterable
+    if isinstance(color, Iterable):
         color = list(color)
     if isinstance(color, str) or (isinstance(color, (list, tuple)) and len(color)==3):
         color = [color]
