@@ -27,11 +27,8 @@ void define_polyhedron_lvec(py::class_<A> & cls){
   using namespace polystar;
   using namespace polystar::polyhedron;
   using namespace pybind11::literals;
-  cls.def("rotate", [](const A &p, const PointSymmetry &s, const ind_t i) {
-    return p.apply(s, i);
-  });
-  cls.def("to_Cartesian", [](const A & p){
-    return Poly<T,bArray>(p.vertices().xyz(), p.faces());
+  cls.def("rotate", [](const A &p, const std::array<T,9> &s) {
+    return p.apply(s);
   });
 }
 

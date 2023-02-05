@@ -26,7 +26,6 @@ along with polystar. If not, see <https://www.gnu.org/licenses/>.            */
 #include <csignal>
 #include "tetgen.h"
 #include "array_.hpp" // defines bArray
-#include "array_l_.hpp"
 #include "utilities.hpp"
 namespace polystar {
 
@@ -1108,6 +1107,136 @@ namespace polystar {
     }
     return true;
   }
+
+  /**
+   * den = (a[0].x - a[1].x) * (b[0].y - b[1].y) - (a[0].y - a[1].y) * (b[0].x - b[1].x)
+    if den != 0:
+        num = (a[0].x - b[0].x) * (b[0].y - b[1].y) - (a[0].y - b[0].y) * (b[0].x - b[1].x)
+        t = num / den
+        return (ends_ok and 0 <= t <= 1) or 0 < t < 1, a[0] + (a[1] - a[0]) * t
+    # are the lines parallel but offset, parallel but not overlapping, or overlapping
+    return lines_overlap(a, b), None
+   *
+   * */
+
+  template<class T, template<class> class A>
+    std::pair<size_t, A<T>>
+    intersection2d(const A<T>& va, const std::pair<ind_t, ind_t> & pa, const A<T> & vb, const std::pair<ind_t, ind_t> & pb){
+      auto p = va.view(pa.first);
+      auto r = va.view(pa.second) - p;
+      auto q = vb.view(pb.first);
+      auto s = vb.view(pb.second) - q;
+      // solve p + t * r == q + u * s
+      auto r_x_s = cross2d(r, s).val(0,0);
+      auto qp = q - p;
+      if (r_x_s == 0) {
+        // the lines are parallel, check for overlap -- otherwise no intersection
+        if (0 == cross2d(qp, r).val(0,0)){
+          // lines are collinear
+          auto r2 = dot(r, r).val(0,0);
+          auto t0 = dot(qp, r).val(0,0) / r2;
+          auto sr = dot(s, r).val(0,0);
+          auto t1 = t0 + sr / r2;
+          if (sr < 0) std::swap(t0, t1);
+          if ((t0 <= 0 && t1 >= 0) || (t0 >= 0 && t0 <= 1 && t1 > t0)) {
+            // collinear *and* overlap
+            auto x0 = t0 <= 0 ? p : p + std::sqrt(t0) * r;
+            auto x1 = t1 >= 1 ? p + r : p + std::sqrt(t1) * r;
+            return std::make_pair(2u, cat(0, x0, x1));
+          }
+        }
+        // either not collinear (so no overlap) or collinear but no found overlap
+        return std::make_pair(0u, A<T>());
+      }
+      // not collinear, so they *do* intersect somewhere
+      auto t = cross2d(qp, s).val(0, 0) / r_x_s;
+      auto x  = p + t * r;
+      return std::make_pair((0 <= t && t <= 1) ? 1u : 0u, x);
+    }
+
+  template<class T, template<class> class A>
+    bool intersect2d(const A<T>& va, const std::pair<ind_t, ind_t> & pa, const A<T> & vb, const std::pair<ind_t, ind_t> & pb){
+      auto i2d = intersection2d(va, pa, vb, pb);
+      return 0 < i2d.first;
+    }
+
+
+template<class T, template<class> class A>
+std::enable_if_t<isBareArray<T, A>, std::vector<ind_t>>
+find_convex_hull_edges(const A<T>& points, const T tol=T(0), const int dig=1){
+  if (points.size(0) < 3)
+    throw std::runtime_error("Not enough points to form a 2D Convex Hull");
+  // find the compass point indexes
+  auto north = points.size(0);
+  auto south{north}, east{north}, west{north};
+  auto avg = points.sum(0) / static_cast<T>(points.size(0));
+  T x_min{(std::numeric_limits<T>::max)()}, x_max{(std::numeric_limits<T>::min)()};
+  T y_min{x_min}, y_max{x_max};
+  for (ind_t i=0; i<points.size(0); ++i){
+    const T & x{points.val(i,0)};
+    const T & y{points.val(i,1)};
+    if (x < x_min) {x_min = x; west = i;}
+    if (x > x_max) {x_max = x; east = i;}
+    if (y < y_min) {y_min = y; south = i;}
+    if (y > y_max) {y_max = y; north = i;}
+  };
+  /* there could be, e.g., multiple equal-y-to-north points
+     But we don't care as it does not matter here
+     We want to connect E->N->W->S->E in four parts, within each part we can
+     exclude all points closer to the origin (or on the other side of the origin)
+     than the line connecting the compass points.
+  */
+  ind_t compass[]{east, north, west, south, east};
+  std::vector<ind_t> path;
+  path.reserve(points.size(0));
+  for (size_t quad=0; quad<4; ++quad){
+    if (compass[quad] == compass[quad+1]) {
+      // there are no points between *and* the next iteration should add the point to the path.
+      // this only fails if we have a single-point to find the convex hull, but that case is
+      // already excluded. So this loop iteration should be safe to skip
+      continue;
+    }
+    path.push_back(compass[quad]);
+    const auto & to{points.view(compass[quad+1])};
+    auto to_hat = (to - avg) / norm(to - avg);
+    bool keep_going{true};
+    while (keep_going){
+      const auto & from{points.view(path.back())};
+      auto border = to - from;
+      auto to_consider = cross2d(points - from, border).find(cmp::gt, T(0), tol, dig);
+      // to consider should not contain the index for from *or* to (that is, goal).
+      if (to_consider.empty()){
+        keep_going = false;
+      } else {
+        // in fact any points within uncertainty of the from-to line are excluded
+        // Of those to consider, find the one with p-avg pointing closest to to-avg
+        auto p = points.extract(to_consider) - avg; // indexing p also indexes to_consider
+        auto p_norm = norm(p);
+        p /= p_norm;
+        auto cos_theta = cross2d(to_hat, p);
+        auto best = cos_theta.find(cmp::eq, cos_theta.min(), tol, tol, dig);
+        if (best.size() > 1) {
+          // pick the longest p with the smallest angle
+          auto smallest_angle = p_norm.extract(best);
+          auto longest = smallest_angle.find(cmp::eq, smallest_angle.max(), tol, tol, dig);
+          // same angle and distance means they're the same point -- pick the first anyway
+          if (longest[0] != 0) best[0] = best[longest[0]];
+        }
+        // best is one number *or* we've move the best one to the front
+        path.push_back(to_consider[best[0]]);
+      }
+    }
+  }
+  // path is the list of convex hull vertices (east, ... , north, ..., west, ..., south, ...) [east not repeated]
+  return path;
+}
+
+//template<class T, template<class> class A>
+//std::enable_if_t<isLatVec<T,A>, std::vector<ind_t>>
+//find_convex_hull_edges(const A<T>& points, const T Ttol=T(0), const int tol=1){
+//  return find_convex_hull_planes(points.xyz(), Ttol, tol);
+//}
+
 
 }
 #endif

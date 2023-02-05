@@ -2,8 +2,6 @@
 #define _POLYSTAR_POLYHEDRON_FLEX_HPP_
 
 #include <utility>
-#include "lattice_dual.hpp"
-#include "array_l_.hpp"
 #include "polyhedron_faces.hpp"
 #include "approx_float.hpp"
 
@@ -144,7 +142,7 @@ namespace polystar::polyhedron{
     // return a modified copy of this Poly
     Poly<T,A> mirror() const {return {T(-1) * _vertices, _faces.mirror()};}
     Poly<T,A> centre() const {return {_vertices - this->centroid(), _faces};}
-    template<class R> Poly<T,A> translate(const lattice::LVec<R>& vector) const {return {_vertices + vector, _faces};}
+    template<class R> Poly<T,A> translate(const A<R>& vector) const {return {_vertices + vector, _faces};}
 
 //    template<class R> Poly<T,A> rotate(const std::array<R,9>& rot) const {
 //      // FIXME This can't compile since get_B_matrix only exists for Reciprocal
@@ -158,14 +156,8 @@ namespace polystar::polyhedron{
 //      }
 //      return {xyz, _faces};
 //    }
-    Poly<T,A> apply(const PointSymmetry& ps, ind_t index) const {
+    Poly<T,A> apply(const std::array<T,9>& r_i) const {
       // FIXME This is only correct if A<T> == LQVec<T>!
-      auto r_i = ps.get(index);
-      if (LengthUnit::inverse_angstrom == _vertices.type()){
-        // r_i is the rotation matrix for real-space vectors; but our vertices
-        // are expressed in the reciprocal space so we must find its transposed
-        r_i = transpose(r_i);
-      }
       auto rotated =  0 * _vertices;
       for (ind_t i=0; i < _vertices.size(0); ++i){
         utils::multiply_matrix_vector(rotated.ptr(i), r_i.data(), _vertices.ptr(i));

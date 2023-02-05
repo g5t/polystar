@@ -6,9 +6,7 @@
 #include <utility>
 #include <set>
 
-#include "lattice_dual.hpp"
 #include "array_.hpp"
-#include "array_l_.hpp"
 #include "geometry.hpp"
 #include "approx_float.hpp"
 

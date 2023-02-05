@@ -25,9 +25,7 @@ along with polystar. If not, see <https://www.gnu.org/licenses/>.            */
 #include "array_attributes.hpp"
 #include "types.hpp"
 #include "utilities.hpp"
-#include "enums.hpp"
 #include "array_.hpp"
-#include "lattice_dual.hpp"
 //#include "geometry.hpp"
 
 namespace polystar {
@@ -156,7 +154,7 @@ ARRAY_LATVEC_BINARY_OP(*)
 ARRAY_LATVEC_BINARY_OP(/)
 #undef ARRAY_LATVEC_BINARY_OP
 
-#endif // operator overloading macros
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
 /*==============================================================================
@@ -186,19 +184,41 @@ ARRAY_LATVEC_BINARY_OP(/)
     }
     return oarray;
   }
-  // cross (LatVec × LatVec)
-  template<class T, class R, template<class> class L, class S=std::common_type_t<std::common_type_t<T, R>, double>>
-  std::enable_if_t<bothLatVecs<T,L,R,L>, L<S>>
-  cross(const L<T>& a, const L<R>& b) {
-    assert( a.same_lattice(b) );
-    auto oarray = cross(a.hkl(), b.hkl());
-    // setup the output array
-    auto lat = a.lattice();
-    auto lu = a.type() == LengthUnit::angstrom ? LengthUnit::inverse_angstrom : LengthUnit::angstrom;
-    auto cross_star = L<S>(lu, lat, oarray);
-    cross_star *= static_cast<S>(lat.volume(a.type())/polystar::math::two_pi);
-    return cross_star.star();
+  // cross (Array × Array)
+  template<class T, class R, template<class> class L, class S=std::common_type_t<T, R>>
+  std::enable_if_t<bareArrays<T,L,R,L>, L<S>>
+  cross2d(const L<T>& a, const L<R>& b) {
+    using namespace polystar::utils;
+    assert( a.size(1) == 2 && b.size(1)== 2 );
+    assert( a.is_row_ordered() && b.is_row_ordered() && a.is_contiguous() && b.is_contiguous() );
+    polystar::ind_t aN=a.size(0), bN=b.size(0);
+    assert( 1u==aN || 1u==bN || aN==bN );
+    polystar::ind_t oO = (1u == aN) ? bN : aN;
+    auto oarray = L<S>(oO, 1u); // row-ordered contiguous
+    if (1u == aN || 1u == bN){
+      if (1u == aN){
+        for (polystar::ind_t j=0; j<bN; ++j) vector_cross<S,T,R,2>(oarray.ptr(j), a.ptr(0), b.ptr(j));
+      } else {
+        for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,2>(oarray.ptr(j), a.ptr(j), b.ptr(0));
+      }
+    } else {
+      for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,2>(oarray.ptr(j), a.ptr(j), b.ptr(j));
+    }
+    return oarray;
   }
+//  // cross (LatVec × LatVec)
+//  template<class T, class R, template<class> class L, class S=std::common_type_t<std::common_type_t<T, R>, double>>
+//  std::enable_if_t<bothLatVecs<T,L,R,L>, L<S>>
+//  cross(const L<T>& a, const L<R>& b) {
+//    assert( a.same_lattice(b) );
+//    auto oarray = cross(a.hkl(), b.hkl());
+//    // setup the output array
+//    auto lat = a.lattice();
+//    auto lu = a.type() == LengthUnit::angstrom ? LengthUnit::inverse_angstrom : LengthUnit::angstrom;
+//    auto cross_star = L<S>(lu, lat, oarray);
+//    cross_star *= static_cast<S>(lat.volume(a.type())/polystar::math::two_pi);
+//    return cross_star.star();
+//  }
 #else
   /*! \brief Find the cross product of two Array2 or LatVec arrays
 
@@ -386,28 +406,28 @@ std::enable_if_t<bothArrays<T,A,R,A>, A<S>>
 cat(const polystar::ind_t dim, const A<T>& a, const A<R>& b, Args... args){
   return cat(dim,cat(dim,a,b),args...);
 }
-/*! \brief Return the same absolute vectors expressed in their dual lattice
-
-For one or more vectors provided in a LDVec or LQVec find the vector expressed
-in the dual lattice which has the same magnitude (but not unit) and direction.
-
-\param v A LDVec (or LQVec) containing one or more lattice vectors
-\return A LQVec (LDVec) expressing the same absolute magnitude and direction
-        vectors in the dual lattice to the input.
-*/
-template<class T, template<class> class L, class S = std::common_type_t<T, double>>
-std::enable_if_t<isLatVec<T,L>, L<S>>
-star(const L<T>& v){
-  auto lat = v.lattice();
-  auto covariant_metric = lat.metric(v.type());
-  auto lu = v.type() == LengthUnit::angstrom ? LengthUnit::inverse_angstrom : LengthUnit::angstrom;
-  auto vstar = L<S>(lu, lat, v.shape());
-  auto vsh = v.shape();
-  vsh.back() = 0;
-  for (auto x: v.subItr(vsh)) // iterate over all but the last dimension
-    polystar::utils::multiply_matrix_vector(vstar.ptr(x), covariant_metric.data(), v.ptr(x));
-  return vstar;
-}
+///*! \brief Return the same absolute vectors expressed in their dual lattice
+//
+//For one or more vectors provided in a LDVec or LQVec find the vector expressed
+//in the dual lattice which has the same magnitude (but not unit) and direction.
+//
+//\param v A LDVec (or LQVec) containing one or more lattice vectors
+//\return A LQVec (LDVec) expressing the same absolute magnitude and direction
+//        vectors in the dual lattice to the input.
+//*/
+//template<class T, template<class> class L, class S = std::common_type_t<T, double>>
+//std::enable_if_t<isLatVec<T,L>, L<S>>
+//star(const L<T>& v){
+//  auto lat = v.lattice();
+//  auto covariant_metric = lat.metric(v.type());
+//  auto lu = v.type() == LengthUnit::angstrom ? LengthUnit::inverse_angstrom : LengthUnit::angstrom;
+//  auto vstar = L<S>(lu, lat, v.shape());
+//  auto vsh = v.shape();
+//  vsh.back() = 0;
+//  for (auto x: v.subItr(vsh)) // iterate over all but the last dimension
+//    polystar::utils::multiply_matrix_vector(vstar.ptr(x), covariant_metric.data(), v.ptr(x));
+//  return vstar;
+//}
 
 
 /*! \brief Matrix * LatVec

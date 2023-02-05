@@ -4,7 +4,7 @@
 
 #ifndef POLYSTAR_HDF_INTERFACE_HPP
 #define POLYSTAR_HDF_INTERFACE_HPP
-#include "enums.hpp"
+
 #ifdef USE_HIGHFIVE
 
 #include <map>
@@ -31,6 +31,24 @@ namespace polystar {
     overwrite_data(T& obj, const std::string& entry, V... args){
       if (obj.exist(entry)) obj.unlink(entry);
       return obj.createDataSet(entry, args...);
+  }
+
+  template<class T, class R>
+  std::enable_if_t<std::is_base_of_v<HighFive::Object, R>, bool>
+  list_to_hdf(const std::vector<T>& list, R& obj, const std::string & entry){
+    using namespace HighFive;
+    if (obj.exist(entry)) obj.unlink(entry);
+    obj.createDataSet(entry, list);
+    return true;
+  }
+
+  template<class T, class R>
+  std::enable_if_t<std::is_base_of_v<HighFive::Object, R>, std::vector<T>>
+  list_from_hdf(R& obj, const std::string & entry){
+    auto dataset = obj.getDataSet(entry);
+    std::vector<T> out;
+    dataset.read(out);
+    return out;
   }
 
   template<class T, class R>
@@ -154,10 +172,10 @@ namespace polystar {
 
 // predeclare the specialisations of HighFive's create_datatype function
 namespace HighFive {
-template<> DataType create_datatype<polystar::RotatesLike>();
-template<> DataType create_datatype<polystar::Bravais>();
-template<> DataType create_datatype<polystar::LengthUnit>();
-template<> DataType create_datatype<polystar::NodeType>();
+//template<> DataType create_datatype<polystar::RotatesLike>();
+//template<> DataType create_datatype<polystar::Bravais>();
+//template<> DataType create_datatype<polystar::LengthUnit>();
+//template<> DataType create_datatype<polystar::NodeType>();
 template<> DataType create_datatype<polystar::HF_Matrix<int>>();
 template<> DataType create_datatype<polystar::HF_Matrix<double>>();
 template<> DataType create_datatype<polystar::HF_Motion<int,double>>();

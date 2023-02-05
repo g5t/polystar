@@ -374,6 +374,12 @@ public:
         c[2] = static_cast<T>(a[0])* static_cast<T>(b[1]) - static_cast<T>(a[1])* static_cast<T>(b[0]);
     }
 };
+template<typename T, typename R, typename S> class vector_cross_impl<T,R,S,2>{
+public:
+  static void vector_cross(T * c, const R * a, const S * b) {
+    c[0] = static_cast<T>(a[0])* static_cast<T>(b[1]) - static_cast<T>(a[1])* static_cast<T>(b[0]);
+  }
+};
 #endif
 
 /*! \brief Take the vector cross product between two 3-vectors

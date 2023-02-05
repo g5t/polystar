@@ -51,21 +51,10 @@ endif()
 
 list(APPEND CXX_SOURCES
   approx_config.cpp
-  bravais.cpp
-  bz.cpp
-  bz_move.cpp
-  bz_wedge.cpp
   comparisons.cpp
   debug.cpp
-  hall_symbol.cpp
-  neighbours.cpp
   polyhedron_faces.cpp
-  pointgroup.cpp
-  pointsymmetry.cpp
   process_id.cpp
-  spg_database.cpp
-  symmetry.cpp
-  vertex_map_set.cpp
 )
 
 if(POLYSTAR_HDF5)

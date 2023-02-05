@@ -15,17 +15,17 @@ See the GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with polystar. If not, see <https://www.gnu.org/licenses/>.            */
 #include <pybind11/pybind11.h>
-#include "_polyhedron.hpp"
-void wrap_polyhedron(pybind11::module &m){
+#include "_polygon.hpp"
+void wrap_polygon(pybind11::module &m){
   using namespace polystar;
-  using namespace polystar::polyhedron;
+  using namespace polystar::polygon;
   namespace py = pybind11;
 
-  py::class_<Poly<double,bArray>> bare(m, "Polyhedron");
-  define_polyhedron_inits<double>(bare);
-  define_polyhedron<double>(bare);
+  py::class_<Poly<double,bArray>> bare(m, "Polygon");
+  define_polygon_inits<double>(bare);
+  define_polygon<double>(bare);
 
 //  py::class_<Poly<double,LVec>> lvec(m, "LPolyhedron");
-//  define_polyhedron<double>(lvec);
-//  define_polyhedron_lvec<double>(lvec);
+//  define_polygon<double>(lvec);
+//  define_polygon_lvec<double>(lvec);
 }
