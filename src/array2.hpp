@@ -436,6 +436,8 @@ public:
   Array2<T> prod(ind_t dim) const;
   Array2<T> min(ind_t dim=0) const;
   Array2<T> max(ind_t dim=0) const;
+  T elmin() const;
+  T elmax() const;
   T sum() const;
   T prod() const;
   template<class R, size_t Nel>

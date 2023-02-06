@@ -25,6 +25,10 @@ void wrap_polygon(pybind11::module &m){
   define_polygon_inits<double>(bare);
   define_polygon<double>(bare);
 
+  py::class_<Poly<int,bArray>> coord(m, "CoordinatePolygon");
+  define_polygon_inits<int>(coord);
+  define_polygon<int>(coord);
+
 //  py::class_<Poly<double,LVec>> lvec(m, "LPolyhedron");
 //  define_polygon<double>(lvec);
 //  define_polygon_lvec<double>(lvec);

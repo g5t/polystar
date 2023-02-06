@@ -593,6 +593,20 @@ Array2<T>::max(const ind_t dim) const{
   return out;
 }
 
+
+template<class T>
+T Array2<T>::elmin() const {
+  T out{val(0,0)};
+  for (const auto & x: valItr()) if (x < out) out = x;
+  return out;
+}
+template<class T>
+T Array2<T>::elmax() const {
+  T out{val(0,0)};
+  for (const auto & x: valItr()) if (x > out) out = x;
+  return out;
+}
+
 template<class T>
 T Array2<T>::sum() const{
   T out{0};

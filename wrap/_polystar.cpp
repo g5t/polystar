@@ -21,6 +21,7 @@ along with polystar. If not, see <https://www.gnu.org/licenses/>.            */
 void wrap_debug(pybind11::module &);
 void wrap_polyhedron(pybind11::module &);
 void wrap_approx(pybind11::module &);
+void wrap_polygon(pybind11::module &);
 void wrap_bitmap(pybind11::module &);
 
 void wrap_version(pybind11::module & m){
@@ -54,5 +55,6 @@ PYBIND11_MODULE(_polystar, m){
   wrap_polyhedron(m);
   wrap_debug(m);
   wrap_approx(m);
+  wrap_polygon(m);
   wrap_bitmap(m);
 }

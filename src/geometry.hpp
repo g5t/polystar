@@ -1214,11 +1214,11 @@ find_convex_hull_edges(const A<T>& points, const T tol=T(0), const int dig=1){
         auto p_norm = norm(p);
         p /= p_norm;
         auto cos_theta = cross2d(to_hat, p);
-        auto best = cos_theta.find(cmp::eq, cos_theta.min(), tol, tol, dig);
+        auto best = cos_theta.find(cmp::eq, cos_theta.elmin(), tol, dig);
         if (best.size() > 1) {
           // pick the longest p with the smallest angle
           auto smallest_angle = p_norm.extract(best);
-          auto longest = smallest_angle.find(cmp::eq, smallest_angle.max(), tol, tol, dig);
+          auto longest = smallest_angle.find(cmp::eq, smallest_angle.elmax(), tol, dig);
           // same angle and distance means they're the same point -- pick the first anyway
           if (longest[0] != 0) best[0] = best[longest[0]];
         }

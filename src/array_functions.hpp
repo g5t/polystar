@@ -332,7 +332,7 @@ dot(const L1<T> &a, const L2<R> &b){
   template<class T, template<class> class L, class S=std::common_type_t<T,double>>
   std::enable_if_t<isBareArray<T,L>, L<S>>
   norm(const L<T> &a){
-    L<S> out = dot(a,a);
+    L<S> out = S(1) * dot(a,a);
     for (auto& x : out.valItr()) x = std::sqrt(x);
     return out;
   }

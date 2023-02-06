@@ -269,8 +269,8 @@ namespace polystar::bitmap {
     Bitmap<T> dilate_edges(const ind_t n) const;
     Bitmap<T> erode_edges(const ind_t n) const;
 
-    std::vector<polygon::Poly<ind_t, Array2>> extract_polygons(coordinates::system, T level, T tol=T(0), int dig=1) const;
-    polygon::Poly<ind_t, Array2> extract_polygon(Array2<bool>&, coordinates::Point<ind_t>, coordinates::system, T, T, int) const;
+    std::vector<polygon::Poly<int, Array2>> extract_polygons(coordinates::system, T level, T tol=T(0), int dig=1) const;
+    polygon::Poly<int, Array2> extract_polygon(Array2<bool>&, coordinates::Point<ind_t>, coordinates::system, T, T, int) const;
   };
 
   template<class T> using filter_queue_t = std::deque<std::pair<T, ind_t>>;
@@ -283,11 +283,11 @@ namespace polystar::bitmap {
     // remove un-needed values (comparer is <= for dilation; >= for erosion)
     while (!fifo.empty() && comparer(fifo.back().first, value)) fifo.pop_back();
     // delete out-of-window value, if present
-    if (!fifo.empty() && write > left + fifo.front().second) fifo.pop_front();
+    if (!fifo.empty() && (left + fifo.front().second) < write) fifo.pop_front();
     // add the current value to the queue
     fifo.emplace_back(value, read);
     // return the front value if we've reached the end of the window or line
-    return std::min(N, write + right) == read ? std::make_optional(fifo.front().first) : std::nullopt;
+    return std::min(N-1, write + right) == read ? std::make_optional(fifo.front().first) : std::nullopt;
   }
 
   /*              comparer         pad
@@ -311,11 +311,11 @@ namespace polystar::bitmap {
         auto horizontal = std::make_optional(pad);
         if (line_read < M){
           auto value = column_read < N ? image.value(line_read, column_read++) : pad;
-          horizontal = filter1d(comparer, std::min(column_read, N), column_write, value, left, right, N, fifo);
+          horizontal = filter1d(comparer, std::min(column_read, N-1), column_write+1, value, left, right, N, fifo);
         }
         // vertical filter on the columns_written column
         if (horizontal.has_value()){
-          auto vertical = filter1d(comparer, std::min(line_read, M), line_write, horizontal.value(), top, bottom, M, queues[column_write]);
+          auto vertical = filter1d(comparer, std::min(line_read, M-1), line_write, horizontal.value(), top, bottom, M, queues[column_write]);
           if (vertical.has_value()) {
             out.value(line_write, column_write) = vertical.value();
             wrote_to_line = true;
@@ -333,12 +333,10 @@ namespace polystar::bitmap {
   template<class T> bool erode_compare(const T & a, const T & b) {return a >= b;}
 
   template<class T> Bitmap<T> Bitmap<T>::dilate(ind_t n) const {
-    auto e = n >> 1;
-    return filter2d(dilate_compare<T>, (std::numeric_limits<T>::min)(), *this, e, e, e, e);
+    return filter2d(dilate_compare<T>, (std::numeric_limits<T>::min)(), *this, n, n, n, n);
   }
   template<class T> Bitmap<T> Bitmap<T>::erode(ind_t n) const {
-    auto e = n >> 1;
-    return filter2d(erode_compare<T>, (std::numeric_limits<T>::max)(), *this, e, e, e, e);
+    return filter2d(erode_compare<T>, (std::numeric_limits<T>::max)(), *this, n, n, n, n);
   }
   template<class T> Bitmap<T> Bitmap<T>::dilate_edges(ind_t n) const {
     return Bitmap<T>(dilate(n).values() - map_);
@@ -352,16 +350,16 @@ namespace polystar::bitmap {
 
 
 
-  template<class T> std::vector<polygon::Poly<ind_t, Array2>> Bitmap<T>::extract_polygons(const coordinates::system cs, const T level, const T tol, const int dig) const {
+  template<class T> std::vector<polygon::Poly<int, Array2>> Bitmap<T>::extract_polygons(const coordinates::system cs, const T level, const T tol, const int dig) const {
     // go searching for part of a polygon by rastering the image:
     Array2<bool> visited(map_.size(0), map_.size(1), false);
-    std::vector<polygon::Poly<ind_t, Array2>> out;
+    std::vector<polygon::Poly<int, Array2>> out;
     for (const auto & sub: map_.subItr()) if (!visited[sub]) {
       if (approx_float::scalar(map_[sub], level, tol, tol, dig)) out.push_back(extract_polygon(visited, sub, cs, level, tol, dig));
     }
     return out;
   }
-  template<class T> polygon::Poly<ind_t, Array2> Bitmap<T>::extract_polygon(
+  template<class T> polygon::Poly<int, Array2> Bitmap<T>::extract_polygon(
     Array2<bool>& visited, coordinates::Point<ind_t> sub0, const coordinates::system cs, const T level, const T tol, const int dig
     ) const {
     using namespace coordinates;
@@ -378,7 +376,7 @@ namespace polystar::bitmap {
       return approx_float::scalar(map_[as<ind_t>(x).coord()], level, tol, tol, dig);
     };
 
-    std::vector<std::array<ind_t, 2>> vertices;
+    std::vector<std::array<int, 2>> vertices;
     auto directions = ccw_directions<int>(cs);
     size_t dir{0};
     auto last_dir = directions[0];
@@ -407,15 +405,15 @@ namespace polystar::bitmap {
         next_pos += directions[dir];
         if (stepped){
           stepped = false;
-          vertices.push_back(as<ind_t>(last_dir).coord());
+          vertices.push_back(as<int>(last_dir).coord());
         }
       }
     } while (step < 1 && last_pos != first_pos);
 
-    auto poly_vertices = Array2<ind_t>::from_std(vertices);
+    auto poly_vertices = Array2<int>::from_std(vertices);
     std::vector<ind_t> border(static_cast<size_t>(poly_vertices.size(0)));
     std::iota(border.begin(), border.end(), 0u);
-    return polygon::Poly<ind_t, Array2>(poly_vertices, polygon::Wires(border));
+    return polygon::Poly<int, Array2>(poly_vertices, polygon::Wires(border));
   }
 
 } // end namespace polystar::bitmap
