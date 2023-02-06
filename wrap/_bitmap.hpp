@@ -30,6 +30,8 @@ void define_bitmap(py::class_<A> & cls){
   cls.def("erode_edges", [](const A& p, int n){return p.erode_edges(n);});
   cls.def("extract_image_polygons", [](const A& p, T level){return p.extract_polygons(coordinates::system::y_down_x_right, level);});
   cls.def("extract_array_polygons", [](const A& p, T level){return p.extract_polygons(coordinates::system::y_up_x_right, level);});
+  cls.def("write_image", [](const A&p, std::string filename){return write(p.image(coordinates::system::y_down_x_right), filename);});
+  cls.def("write_array", [](const A&p, std::string filename){return write(p.image(coordinates::system::y_up_x_right), filename);});
 }
 
 #endif

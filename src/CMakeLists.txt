@@ -55,6 +55,7 @@ list(APPEND CXX_SOURCES
   debug.cpp
   polyhedron_faces.cpp
   process_id.cpp
+  bitmap.cpp
 )
 
 if(POLYSTAR_HDF5)
