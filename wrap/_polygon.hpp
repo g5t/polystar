@@ -34,13 +34,20 @@ void define_polygon(py::class_<A> & cls){
   using namespace polystar::polygon;
   using namespace pybind11::literals;
   cls.def_property_readonly("vertices", [](const A& p){return a2py(p.vertices());});
-  cls.def_property_readonly("border", [](const A& p){return p.wires().border();});
-  cls.def_property_readonly("wires", [](const A& p){return p.wires().wires();});
+  cls.def_property_readonly("border", [](const A& p){return Wire::base_t(p.wires().border());});
+  cls.def_property_readonly("wires", [](const A& p){
+    auto wires = p.wires().wires();
+    // strip off the Wire type information
+    std::vector<Wire::base_t> ow;
+    ow.reserve(wires.size());
+    for (const auto & wire: wires) ow.emplace_back(wire);
+    return ow;
+  });
 //  cls.def_property_readonly("border", [](const A& p){return a2py(p.wires().border());});
 //  cls.def_property_readonly("wires", [](const A& p){return a2py(p.wires().wires());});
   cls.def_property_readonly("area", &A::area);
   cls.def_property_readonly("mirror",&A::mirror);
-  cls.def_property_readonly("centroid",&A::centroid);
+  cls.def_property_readonly("centroid",[](const A& p){return a2py(p.centroid());});
 //  cls.def("intersection",[](const A& p, const A& o){return p.intersection(o);});
 }
 

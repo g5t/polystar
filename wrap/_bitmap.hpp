@@ -4,6 +4,7 @@
 #include "_array.hpp"
 #include "_c_to_python.hpp"
 #include "bitmap.hpp"
+#include "bitmap_path.hpp"
 #include "utilities.hpp"
 
 template<class T, class A>
