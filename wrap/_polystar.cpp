@@ -23,6 +23,7 @@ void wrap_polyhedron(pybind11::module &);
 void wrap_approx(pybind11::module &);
 void wrap_polygon(pybind11::module &);
 void wrap_bitmap(pybind11::module &);
+void wrap_polygon_network(pybind11::module &);
 
 void wrap_version(pybind11::module & m){
   using namespace polystar::version;
@@ -57,4 +58,5 @@ PYBIND11_MODULE(_polystar, m){
   wrap_approx(m);
   wrap_polygon(m);
   wrap_bitmap(m);
+  wrap_polygon_network(m);
 }

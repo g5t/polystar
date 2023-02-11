@@ -57,6 +57,8 @@ list(APPEND CXX_SOURCES
   process_id.cpp
   bitmap.cpp
   bitmap_path.cpp
+  bitmap_show.cpp
+  polygon_wire.cpp
 )
 
 if(POLYSTAR_HDF5)

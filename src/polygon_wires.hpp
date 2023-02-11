@@ -14,6 +14,7 @@
 
 namespace polystar::polygon {
   using ind_t = polystar::ind_t;
+  class Wire;
 
   class Wires {
   public:
@@ -84,6 +85,82 @@ namespace polystar::polygon {
         return Wires(border, wires);
       }
       return Wires(border);
+    }
+
+    // Remove any wires_ by cleverly appending them to border_
+    template<class T, template<class> class A>
+      Wires simplify(const A<T>& vertices) const {
+      // if there are no internal wires, there's nothing to do:
+      if (!wires_.has_value()) return Wires(border_);
+      // HUGE ASSUMPTION: All wires must be fully inside the border, arranged to have 'negative' area (they're holes)
+      //                  and do not overlap with one another.
+      /* 1. Pick an internal wire which has not had an edge failure
+            If there are no such wires, the polygon can not be simplified.
+         2. Find an edge between one of its vertices and a border vertex which is inside the polygon
+            (The edge must be *inside* the border and *outside* all wires!)
+            If there are no such edges, record the failure and go back to 1.
+         3. Insert the wire in the border (the chosen border vertex and wire vertex are visited twice each)
+         4. If there are any remaining wires, clear the failed-edge list and go back to 1.
+      */
+      auto b = border_;
+      auto ws = wires_.value();
+      size_t failures{0u};
+
+      while (failures < ws.size()){
+        auto w = ws[failures];
+        // find the joining edge:
+        // TODO Make this choose the *shortest* possible joining edge?
+        ind_t wi{0}, bi{0};
+        bool has_intersection{true};
+        for (; wi < w.size(); ++wi){
+          for (; bi < b.size(); ++bi){
+            typename wire_t::edge_t se{wi, bi};
+            has_intersection = intersects(vertices, se, vertices, false);
+            if (!has_intersection) break;
+          }
+          if (!has_intersection) break;
+        }
+        if (has_intersection) {
+          ++failures;
+        } else {
+          // Add the edge border[bi] -- wire[failures][wi]
+          // The new border is b[:bi] -- w[wi:] -- w[:wi] -- b[bi:]
+          // Where x[:n] means [0,n] {upper bound inclusive} and x[n:] means [n,x.size()) {upper bound exclusive}
+          typename wire_t::base_t new_b;
+          new_b.reserve(b.size() + w.size());
+          for (size_t i=0; i<std::min(static_cast<size_t>(bi+1), b.size()); ++i) new_b.push_back(b[i]);
+          for (size_t i=wi; i<w.size(); ++i) new_b.push_back(w[i]);
+          for (size_t i=0; i<std::min(static_cast<size_t>(wi+1), w.size()); ++i) new_b.push_back(w[i]);
+          for (size_t i=bi; i<b.size(); ++i) new_b.push_back(b[i]);
+
+          // the border is now new_b
+          b = Wire(new_b);
+          // remove ws[failures]
+          ws.erase(ws.begin()+failures);
+          // reset the failures counter
+          failures = 0u;
+        }
+      }
+      if (!ws.empty()) {
+        std::cout << "Simplification of the complex polygon is not possible\n";
+        return Wires(b, ws);
+      }
+      return Wires(b);
+    }
+
+    template<class T, template<class> class A>
+      Network<T,A> triangulate(const A<T>& v) const {
+      auto s = simplify(v);
+      return s.border().triangulate(v);
+    }
+
+
+    template<class T, template<class> class A>
+      bool intersects(const A<T>& other, const typename wire_t::edge_t edge, const A<T> & ours, bool inclusive=true) const {
+      if (border_.intersects(other, edge, ours, inclusive)) return true;
+      if (wires_.has_value()) for (const auto & w: wires_.value()) if (w.intersects(other, edge, ours, inclusive)) return true;
+      // no intersection ... but the edge could be *inside* the border (... and not inside a hole) -- push this to another function
+      return false;
     }
 
     // direct property accessors
@@ -231,16 +308,29 @@ namespace polystar::polygon {
     }
 
     template<class T, template<class> class A>
-    bool contains(const A<T> &point, const A<T> &x) const {
+    bool contains(const A<T> &point, const A<T> &x, bool inclusive=true) const {
       auto segment = cat(0, point, (std::numeric_limits<T>::max)() + T(0) * point);
       wire_t::edge_t se{0, 1};
       size_t crossings{0};
-      for (size_t i = 0; i < border_.size(); ++i) if (intersect2d(segment, se, x, border_.edge(i))) ++crossings;
+      for (size_t i = 0; i < border_.size(); ++i) if (intersect2d(segment, se, x, border_.edge(i), inclusive)) ++crossings;
       if (wires_.has_value())
         for (const auto &w: wires_.value())
-          for (size_t i = 0; i < w.size(); ++i) if (intersect2d(segment, se, x, w.edge(i))) ++crossings;
+          for (size_t i = 0; i < w.size(); ++i) if (intersect2d(segment, se, x, w.edge(i), inclusive)) ++crossings;
       return (crossings % 2u) == 1u;
     }
+
+    template<class T, template<class> class A>
+    bool overlaps(const A<T>& other, const typename wire_t::edge_t edge, const A<T>& ours, bool inclusive=true) const {
+      // whether the edge crosses through this polygon *or* either end is *inside* the polygon without being in a hole
+      if (intersects(other, edge, ours)) return true;
+      const auto p0{other.view(edge.first)};
+      const auto p1{other.view(edge.second)};
+      if (!border_.contains(p0, ours, inclusive) && !border_.contains(p1, ours, inclusive)) return false;
+      if (wires_.has_value()) for (const auto w: wires_.value())
+        if (w.contains(p0, ours, inclusive) && w.contains(p1, ours, inclusive)) return false;
+      return true;
+    }
+
 
 #ifdef USE_HIGHFIVE
     template<class H> std::enable_if_t<std::is_base_of_v<HighFive::Object, H>, bool>

@@ -3,4 +3,6 @@
 
 #include "polygon_poly.hpp"
 
+#include "polygon_network.tpp"
+
 #endif

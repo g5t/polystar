@@ -57,6 +57,28 @@ std::array<size_t, 4> cs_right_direction(const coordinates::system cs){
   }
 }
 
+template<class T>
+Array2<T> flip_range(Array2<T> image, int x0, int y0, int xz){
+  if (xz < x0) std::swap(x0, xz);
+  for (int i=x0; i<xz; ++i) image.val(y0, i) = !(image.val(y0, i));
+  return image;
+}
+
+template<class T, class Ptr>
+Array2<T> flip_inside(Array2<T> image, Ptr first, Ptr last){
+  auto yz = (last - 1)->coord()[0];
+  auto xa = first->coord()[1];
+  for (; first != last; ++first){
+    auto c = first->coord();
+    if (c[0] != yz) {
+      image = flip_range(image, c[1], std::min(c[0], yz), xa);
+      yz = c[0];
+    }
+  }
+  return image;
+}
+
+
 std::tuple<int, std::vector<Point<int>>>
 polystar::bitmap::trace_path(Array2<bool> input, const coordinates::system cs, const Point<int> & start) {
 auto in_bounds = [&](const auto & p){
@@ -66,15 +88,12 @@ auto in_bounds = [&](const auto & p){
 auto is_white = [&](const auto & p){return !in_bounds(p) || !input[as<ind_t>(p).coord()];};
 /* We picked the starting point as the index where a transition from white to black has just occurred */
 const std::array<Point<int>, 4> directions {{{1, 0}, {0, -1}, {-1, 0}, {0, 1}}};
-//    const std::array<Point<int>, 4> reverse {{-1, 0}, {0, 1}, {1, 0}, {0, -1}};
-//const std::array<std::array<size_t, 3>, 4> next_directions {{{{0, 1, 3}}, {{1, 0, 2}}, {{2, 1, 3}}, {{3, 0, 2}}}};
-//auto neighbors = cs_neighbours(cs);
+
 auto abcd_direction = cs_corners(cs);
 auto left = cs_left_direction(cs);
 auto right = cs_right_direction(cs);
 
-size_t dir = 4;
-std::cout << "Starting at " << start << " compare against " << start + Point<int>(0, -1) << " and " << start + Point<int>(-1, 0) << "\n";
+std::optional<size_t> dir{std::nullopt};
 if (is_white(start + Point<int>(0, -1))) {
   // white to left of black -- go along vertical axis first
   dir = 0;
@@ -82,14 +101,10 @@ if (is_white(start + Point<int>(0, -1))) {
   // white above black -- go along horizontal axis first
   dir = 3;
 }
-if (dir >= 4) throw std::runtime_error("Unsupported starting edge detection direction!");
+if (!dir.has_value()) throw std::runtime_error("Unsupported starting edge detection direction!");
 
 std::vector<Point<int>> vertices;
 vertices.push_back(start);
-
-//auto is_possible = [&](const size_t i){
-//  return is_white(vertices.back() + neighbors[i].first) ^ is_white(vertices.back() + neighbors[i].second);
-//};
 
 auto next_direction = [&](const auto & p, const size_t direction){
   auto abcd = abcd_direction[direction];
@@ -98,37 +113,19 @@ auto next_direction = [&](const auto & p, const size_t direction){
   auto c = is_white(p + abcd[2]);
   auto d = is_white(p + abcd[3]);
   if (a && b && c && d){
-    throw std::runtime_error("We made a mistake somewhere");
+    return std::optional<size_t>(std::nullopt);
   }
   if ((a && !b && !c && !d) || (!a && b && c && d)) {
-    return left[direction];
+    return std::make_optional(left[direction]);
   }
   if ((!a && b && !c && !d) || (a && !b && c && d)) {
-    return right[direction];
+    return std::make_optional(right[direction]);
   }
   if ((a && !b && c && !d) || (!a && b && !c && d)) {
-    return direction;
+    return std::make_optional(direction);
   }
   // TODO Implement more complicated choices here?
-  return direction;
-};
-
-auto flip_range = [&](int x0, int y0, int xz){
-  if (xz > x0) std::swap(x0, xz);
-  for (int i=x0; i<xz; ++i) input.val(y0, x0) = !is_white(Point<int>(y0, x0));
-};
-
-auto flip_inside = [&](auto first, const auto last){
-  // TODO make this actually work ... why doesn't it?
-  auto yz = (last - 1)->coord()[0];
-  auto xa = first->coord()[1];
-  for (; first != last; ++first){
-    auto c = first->coord();
-    if (c[0] != yz) {
-      flip_range(c[1], std::min(c[0], yz), xa);
-      yz = c[0];
-    }
-  }
+  return std::make_optional(direction);
 };
 
 // calculate path area along the way:
@@ -137,20 +134,18 @@ int area{0};
 //auto visited = Array2<bool>(input.size(0), input.size(1), false);
 do {
   // take a step
-  vertices.push_back(vertices.back() + directions[dir]);
-//  std::cout << vertices.back() << "\n";
-//  visited.val(as<ind_t>(vertices.back()).coord()) = true;
+  vertices.push_back(vertices.back() + directions[dir.value()]);
   // add to the area
-  area += directions[dir].coord()[0] * vertices.back().coord()[1];
+  area += directions[dir.value()].coord()[0] * vertices.back().coord()[1];
   // check for a newly-closed loop and fill in the enclosed area with its opposite color
   if (vertices.size() > 4) { // we need 5 vertices to enclose *1* pixel
   auto ptr = std::find(vertices.begin(), vertices.end() - 1, vertices.back());
   if (std::distance(ptr, vertices.end()) > 4) {
-      flip_inside(ptr, vertices.end());
+      input = flip_inside(input, ptr, vertices.end());
     }
   }
-  dir = next_direction(vertices.back(), dir);
-} while (start != vertices.back());
+  dir = next_direction(vertices.back(), dir.value());
+} while (dir.has_value() && start != vertices.back());
 
 return std::make_tuple(area, vertices);
 }
@@ -256,14 +251,13 @@ return std::make_tuple(area, vertices);
 //}
 
 std::vector<Point<int>> polystar::bitmap::fix_path(const std::vector<Point<int>> & p) {
-  // This doesn't produce optimal edges, but is probably sufficient for now:
+  // This doesn't produce optimal edges in the potrace sense, but is probably sufficient for now:
   auto stop_segment = [](const auto & s){
     auto l = s.back() - s.front();
     auto pc = as<double>(l).coord();
     auto perp = Point(pc[1], -pc[0]);
     auto pn = perp / std::sqrt(perp * perp);
     for (size_t i=1; i<s.size()-1; ++i){
-//      std::cout << "From " << s[0] << " to " << s[1] << " dot " << pn << " is " << std::abs((s[i] - s[0]) * pn) << "\n";
       if (std::abs((s[i] - s[0]) * pn) >= 1) return true;
     }
     return false;

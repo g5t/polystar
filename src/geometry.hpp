@@ -1121,7 +1121,7 @@ namespace polystar {
 
   template<class T, template<class> class A>
     std::pair<size_t, A<T>>
-    intersection2d(const A<T>& va, const std::pair<ind_t, ind_t> & pa, const A<T> & vb, const std::pair<ind_t, ind_t> & pb){
+    intersection2d(const A<T>& va, const std::pair<ind_t, ind_t> & pa, const A<T> & vb, const std::pair<ind_t, ind_t> & pb, bool inclusive=true){
       auto p = va.view(pa.first);
       auto r = va.view(pa.second) - p;
       auto q = vb.view(pb.first);
@@ -1138,10 +1138,19 @@ namespace polystar {
           auto sr = dot(s, r).val(0,0);
           auto t1 = t0 + sr / r2;
           if (sr < 0) std::swap(t0, t1);
-          if ((t0 <= 0 && t1 >= 0) || (t0 >= 0 && t0 <= 1 && t1 > t0)) {
+          auto st0{std::sqrt(t0)};
+          auto st1{std::sqrt(t1)};
+          if (inclusive && ((t0 <= 0 && t1 >= 0) || (t0 >= 0 && t1 <= 1 && t1 > t0))) {
             // collinear *and* overlap
-            auto x0 = t0 <= 0 ? p : p + std::sqrt(t0) * r;
-            auto x1 = t1 >= 1 ? p + r : p + std::sqrt(t1) * r;
+            // this can cast double valued points to integer, which is not great.
+            auto x0 = t0 <= 0 ? p : A<T>(p + st0 * r);
+            auto x1 = t1 >= 1 ? p + r : A<T>(p + st1 * r);
+            return std::make_pair(2u, cat(0, x0, x1));
+          }
+          if (!inclusive && ((t0 < 0 && t1 > 0) || (t0 > 0 && t1 < 1 && t1 > t0))) {
+            // collinear *and* overlap
+            auto x0 = t0 < 0 ? p : A<T>(p + st0 * r);
+            auto x1 = t1 > 1 ? p + r : A<T>(p + st1 * r);
             return std::make_pair(2u, cat(0, x0, x1));
           }
         }
@@ -1150,13 +1159,17 @@ namespace polystar {
       }
       // not collinear, so they *do* intersect somewhere
       auto t = cross2d(qp, s).val(0, 0) / r_x_s;
+      bool valid{true};
+      if ((!inclusive && (t == 0 || t == 1)) || (t < 0 || t > 1)) valid=false;
       auto x  = p + t * r;
-      return std::make_pair((0 <= t && t <= 1) ? 1u : 0u, x);
+      return std::make_pair(valid ? 1u : 0u, x);
     }
 
   template<class T, template<class> class A>
-    bool intersect2d(const A<T>& va, const std::pair<ind_t, ind_t> & pa, const A<T> & vb, const std::pair<ind_t, ind_t> & pb){
-      auto i2d = intersection2d(va, pa, vb, pb);
+    bool intersect2d(const A<T> & va, const std::pair<ind_t, ind_t> & pa,
+                     const A<T> & vb, const std::pair<ind_t, ind_t> & pb,
+                     bool inclusive=true){
+      auto i2d = intersection2d(va, pa, vb, pb, inclusive);
       return 0 < i2d.first;
     }
 

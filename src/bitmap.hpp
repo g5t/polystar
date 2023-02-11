@@ -11,6 +11,7 @@
 #include "bitmap_color.hpp"
 #include "bitmap_coord.hpp"
 #include "bitmap_path.hpp"
+#include "bitmap_show.hpp"
 
 namespace polystar::bitmap {
   template<class T>
@@ -294,7 +295,6 @@ namespace polystar::bitmap {
           std::vector<ind_t> border(path.size());
           std::iota(border.begin(), border.end(), 0u);
           out.emplace_back(Array2<int>::from_std(vertices), polygon::Wires(border));
-          break;
         }
       }
     return out;

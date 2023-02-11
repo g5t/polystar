@@ -5,6 +5,7 @@ set(POLYSTAR_PYTHON_MODULE_SOURCES
   _polygon.cpp
   _polyhedron.cpp
   _bitmap.cpp
+  _network.cpp
 )
 target_sources(${POLYSTAR_PYTHON_MODULE} PRIVATE ${POLYSTAR_PYTHON_MODULE_SOURCES})
 

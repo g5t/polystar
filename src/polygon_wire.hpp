@@ -10,6 +10,7 @@
 #include "array_.hpp"
 #include "geometry.hpp"
 #include "approx_float.hpp"
+#include "polygon_network.hpp"
 
 namespace polystar::polygon {
   using ind_t = polystar::ind_t;
@@ -57,6 +58,64 @@ namespace polystar::polygon {
     std::back_insert_iterator <base_t> appender() { return std::back_insert_iterator<base_t>(*this); }
 
     template<class T, template<class> class A>
+    bool is_convex(const A<T>& x) const {
+      auto a{x.view(vj(0)) - x.view(vi(0))};
+      auto b{x.view(vj(1)) - x.view(vi(1))};
+      T first = cross2d(a, b).val(0,0);
+      a = b;
+      for (size_t i=2; i<size(); ++i){
+        auto second = cross2d(a, b).val(0, 0);
+        b = x.view(vj(i)) - a.view(vi(i));
+        if (first *  second < 0) return false;
+        std::swap(a, b);
+      }
+      return true;
+    }
+
+    bool shares_edge(const Wire& other, bool backwards_allowed = false) const {
+      // in two dimensions any triangulated (or other-shape-ed) polygon will have internal edges
+      // with the property that two shapes share opposite-vertex-ordered edges
+      for (size_t i=0; i<size(); ++i) for (size_t j=0; j<other.size(); ++j) {
+        auto ei = edge(i);
+        auto ej = other.edge(j);
+        if (ei.first == ej.second && ei.second == ej.first) return true;
+        if (backwards_allowed && ei.first == ej.first && ei.second == ej.second) return true;
+      }
+      return false;
+    }
+
+    template<class T, template<class> class A>
+    Network<T,A> triangulate(const A<T>& x) const {
+      // Use the ear-clipping method to triangulate this possibly-convex polygon
+      Wire remnants{*this};
+      std::vector<Wire> triangles;
+      std::vector<bool> unused(size(), true);
+      size_t i{0};
+      while (remnants.size() > 3) {
+        edge_t e{remnants[(i-1)%remnants.size()], remnants[(i+1)%remnants.size()]};
+        // If the new edge does not hit any edge in the remnants, and is inside of it
+        if (!remnants.intersects(x, e, x, false) && remnants.contains((x.view(e.first)+x.view(e.second))/T(2), x)) {
+          // (i, i+1, i-1) is a triangle in the triangulation
+          base_t tri{remnants.vi(i), e.second, e.first};
+          triangles.emplace_back(tri);
+          // the current point must be removed from the remnants -- and `i` now is the *next* triangle point to consider
+          remnants.erase(remnants.begin()+i);
+        } else {
+          // (i, i+1, i-1) not a triangle -- so move on
+          i++;
+        }
+        // and ensure we only consider in-bounds point indexes
+        i %= remnants.size();
+      }
+      if (remnants.size() == 3){
+        triangles.push_back(remnants);
+      } else {
+        throw std::runtime_error("Fewer than three points can not be triangulated");
+      }
+      return Network<T,A>(triangles, x);
+    }
+
+    template<class T, template<class> class A>
     T area(const A<T> &x) const {
       T a{0};
       for (size_t i = 0; i < size(); ++i) {
@@ -87,17 +146,17 @@ namespace polystar::polygon {
     }
 
     template<class T, template<class> class A>
-    bool contains(const A<T> &point, const A<T> &x) const {
+    bool contains(const A<T> &point, const A<T> &x, bool inclusive=true) const {
       auto segment = cat(0, point, (std::numeric_limits<T>::max)() + T(0) * point);
       edge_t se{0, 1};
       size_t crossings{0};
-      for (size_t i = 0; i < size(); ++i) if (intersect2d(segment, se, x, edge(i))) ++crossings;
+      for (size_t i = 0; i < size(); ++i) if (intersect2d(segment, se, x, edge(i), inclusive)) ++crossings;
       return (crossings % 2u) == 1u;
     }
 
     template<class T, template<class> class A>
-    bool intersects(const A<T> &other, const edge_t &oe, const A<T> &x) const {
-      for (size_t i = 0; i < size(); ++i) if (intersect2d(other, oe, x, edge(i))) return true;
+    bool intersects(const A<T> &other, const edge_t &oe, const A<T> &x, bool inclusive=true) const {
+      for (size_t i = 0; i < size(); ++i) if (intersect2d(other, oe, x, edge(i), inclusive)) return true;
       return false;
     }
 
@@ -206,6 +265,8 @@ namespace polystar::polygon {
     }
 
   };
+
+  Wire wire_merge(const Wire & a, const Wire & b);
 
 } // polystar::polygon
 #endif

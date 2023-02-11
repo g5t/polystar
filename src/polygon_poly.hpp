@@ -11,6 +11,7 @@
 #include "geometry.hpp"
 #include "approx_float.hpp"
 #include "polygon_wires.hpp"
+#include "polygon_network.hpp"
 
 namespace polystar::polygon{
   using ind_t = polystar::ind_t;
@@ -66,6 +67,10 @@ namespace polystar::polygon{
 
     // methods
     [[nodiscard]] Poly<T,A> convex_hull() const {return Poly(vertices_);}
+    [[nodiscard]] Poly<T,A> simplify() const {return Poly(vertices_, wires_.simplify(vertices));}
+    Network<T,A> triangulate() const {
+      return wires_.triangulate(vertices_);
+    }
     [[nodiscard]] bool is_not_approx(const Poly<T,A> & that, const T tol=T(0), const int dig=1) const {
       bool permuted{false};
       if (vertices_ != that.vertices){
