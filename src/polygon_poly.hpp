@@ -55,6 +55,7 @@ namespace polystar::polygon{
       wires_ = std::move(that.wires_);
       return *this;
     }
+
     // direct property accessor
     [[nodiscard]] ind_t vertex_count() const {return vertices_.size(0);}
     [[nodiscard]] size_t face_count() const {return 1u;}
@@ -67,18 +68,18 @@ namespace polystar::polygon{
 
     // methods
     [[nodiscard]] Poly<T,A> convex_hull() const {return Poly(vertices_);}
-    [[nodiscard]] Poly<T,A> simplify() const {return Poly(vertices_, wires_.simplify(vertices));}
+    [[nodiscard]] Poly<T,A> simplify() const {return Poly(vertices_, wires_.simplify(vertices_));}
     Network<T,A> triangulate() const {
       return wires_.triangulate(vertices_);
     }
     [[nodiscard]] bool is_not_approx(const Poly<T,A> & that, const T tol=T(0), const int dig=1) const {
       bool permuted{false};
-      if (vertices_ != that.vertices){
-        permuted = vertices_.is_permutation(that.vertices_, tol, tol, dig);
+      if (vertices_ != that.vertices()){
+        permuted = vertices_.is_permutation(that.vertices(), tol, tol, dig);
         if (!permuted) return true;
       }
       if (permuted){
-        auto permutation = vertices_.permutation_vector(that.vertices_, tol, tol, dig);
+        auto permutation = vertices_.permutation_vector(that.vertices(), tol, tol, dig);
         auto permuted_wires = wires_.permute(permutation);
         return permuted_wires != that.wires_;
       }
@@ -90,47 +91,40 @@ namespace polystar::polygon{
     [[nodiscard]] bool operator!=(const Poly<T,A>& that) const {return is_not_approx(that);}
     [[nodiscard]] bool operator==(const Poly<T,A>& that) const {return !is_not_approx(that);}
 
-    Poly<T,A> operator+(const Poly<T,A>& that) const {return combine(that);}
+    Poly<T,A> operator+(const Poly<T,A>& that) const {return intersection(that);}
     Poly<T,A> combine(const Poly<T,A>& that, const T tol=T(0), const int dig=1) const {
       // combine vertices
-      auto v = cat(0, vertices_, that.vertices_);
+      auto v = cat(0, vertices_, that.vertices());
       // combined wires
-      auto w = wires_.combine(that.wires_, vertices_.size(0)).wires();
+      Wires w = wires_.combine(that.wires(), vertices_.size(0));
       // check for duplicate vertices
       std::tie(v, w) = remove_duplicate_points_and_update_wire_indexing(v, w, tol, dig);
       // look for overlapping wires now that vertex indexing has been modified
-      std::vector<bool> needed(w.size(), true);
-      for (ind_t i=0; i < w.size()-1; ++i) if (needed[i]) {
-        const auto & a{w[i]};
-        for (ind_t j=i+1; j < w.size(); ++j) if (needed[j]) {
-          const auto & b{w[j]};
-          auto c = std::count_if(a.begin(), a.end(), [&b](const auto & z){
-            return std::count(b.begin(), b.end(), z) > 0;
-          });
-          if (c && std::is_permutation(a.begin(), a.end(), b.begin())) {
-            needed[i] = is_positive_permutation(a, b);
-            needed[j] = false;
-          }
-        }
-      }
-      if (std::find(needed.begin(), needed.end(), false) != needed.end()) {
-        for (ind_t i=0; i<w.size(); ++i) if (!needed[i]) w[i].clear();
-        w.erase(std::remove_if(w.begin(), w.end(), [](const auto & x){return x.empty();}), w.end());
-      }
-      return {v, w};
+      return Poly<T,A>(v, remove_extraneous_wires(w));
+    }
+    Poly<T,A> combine_all(const std::vector<Poly<T,A>> & others, const T tol=T(0), const int dig=1) const {
+      if (others.empty()) return *this;
+      auto out = intersection(others.front(), tol, dig);
+      for (auto ptr = others.begin()+1; ptr != others.end(); ++ptr) out = out.intersection(*ptr, tol, dig);
+      return out;
     }
 
     Poly<T,A> mirror() const {return {T(-1) * vertices_, wires_.mirror()};}
+    Poly<T,A> inverse() const {return {vertices_, wires_.inverse()};}
     Poly<T,A> centre() const {return {vertices_ - centroid(), wires_};}
     Poly<T,A> translate(const A<T>& v) const {return {vertices_ + v, wires_};}
 
-    template<class R, template<class> class B, class... P>
-      [[nodiscard]] std::vector<bool> contains(const B<R>& x, P... p) const {
-      return wires_.contains(vertices_, x, p...);
+    template<class R, template<class> class B>
+      [[nodiscard]] std::vector<bool> border_contains(const B<R>& x) const {
+      return wires_.border_contains(x, vertices_);
     }
-    template<class R, class... P>
-      [[nodiscard]] std::vector<bool> contains(const std::vector<std::array<R,2>> & x, P... p) const {
-      return contains(from_std_like(vertices_, x), p...);
+    template<class R, template<class> class B>
+      [[nodiscard]] std::vector<bool> contains(const B<R>& x) const {
+      return wires_.contains(x, vertices_);
+    }
+    template<class R>
+      [[nodiscard]] std::vector<bool> contains(const std::vector<std::array<R,2>> & x) const {
+      return contains(from_std_like(vertices_, x));
     }
     template<class R, template<class> class B>
       [[nodiscard]] std::enable_if_t<isArray<R, B>, bool>
@@ -141,10 +135,34 @@ namespace polystar::polygon{
       }
       return false;
     }
-    template<class R, template<class> class B>
-      [[nodiscard]] std::enable_if_t<isArray<R,B>, Poly<T,A>> intersection(const Poly<R,B>& that, const R tol=R(0), const int dig=1) const {
-      auto [a, b] = that.edges();
-      return cut(a, b, tol, dig);
+
+    [[nodiscard]] Poly<T,A> intersection(const Poly<T,A>& that, T tol = T(0), int dig = 0) const {
+      // simple-case checks first: ignore the possibility of negative polygon inclusion?
+      auto that_in_this = border_contains(that.vertices());
+      if (std::all_of(that_in_this.begin(), that_in_this.end(), [](const auto x){return x;})) {
+        if (that.area() > T(0) && that.wires().wire_count() == 0) return *this;
+        return insert_hole(that.simplify(), tol, dig);
+      }
+      auto this_in_that = that.border_contains(vertices_);
+      if (std::all_of(this_in_that.begin(), this_in_that.end(), [](const auto x){return x;})) {
+        if (area() > T(0) && wires_.wire_count() == 0) return that;
+        return that.insert_hole(simplify(), tol, dig);
+      }
+      std::cout << "that_in_this ";
+      for (const auto & t: that_in_this) std::cout << (t ? "1" : "0");
+      std::cout << "\nthis_in_that ";
+      for (const auto & t: this_in_that) std::cout << (t ? "1" : "0");
+      std::cout << "\n";
+      // now the complicated case(s)
+      auto ft = [](bool a, bool b){return !a && b;};
+      auto tf = [](bool a, bool b){return a && !b;};
+      if (!is_cyclic_contiguous(that_in_this.begin(), that_in_this.end(), ft, tf)
+        ||!is_cyclic_contiguous(this_in_that.begin(), this_in_that.end(), ft, tf)) {
+        throw std::runtime_error("Too complicated intersection!");
+      }
+
+      std::cout << "Returned polygon is wrong.\n";
+      return *this;
     }
     template<class R, template<class> class B>
     [[nodiscard]] std::enable_if_t<isArray<R,B>, Poly<T,A>> cut(const B<R>& a, const B<R>& b, const R tol=R(0), const int dig=1) const {
@@ -218,6 +236,26 @@ namespace polystar::polygon{
       // update wire vectors
       wires_ = wires_.permute(indexes); // I think this is the same as replacing all values in Wires with indexes[values]
       vertices_ = vertices_.extract(keep);
+    }
+
+    Poly<T,A> insert_hole(const Poly<T,A> & hole, const T tol, const int dig) const {
+      if (hole.area() > 0) return *this;
+      auto ov = vertices_.decouple();
+      // combine the vertices from both polygons into a new vertex list,
+      auto hv = hole.vertices();
+      auto hb = hole.wires().border();
+      typename wires_t::wire_t hw;
+      hw.reserve(hb.size());
+      for (const auto b: hb){
+        // find the index of hv.view(b) in ov
+        auto oi = ov.first(polystar::cmp::eq, hv.view(b), tol, tol, dig); // does this work like I think it does?
+        // if hv.view(b) is not in ov, oi == oi.size(0) -- append it in that case
+        if (oi >= ov.size(0)) ov = cat(0, ov, hv.view(b));
+        // push the vertex to hw
+        hw.push_back(oi);
+      }
+      return {ov, wires_.insert_wire(hw)};
+
     }
   };
 

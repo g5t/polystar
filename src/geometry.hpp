@@ -1108,17 +1108,12 @@ namespace polystar {
     return true;
   }
 
-  /**
-   * den = (a[0].x - a[1].x) * (b[0].y - b[1].y) - (a[0].y - a[1].y) * (b[0].x - b[1].x)
-    if den != 0:
-        num = (a[0].x - b[0].x) * (b[0].y - b[1].y) - (a[0].y - b[0].y) * (b[0].x - b[1].x)
-        t = num / den
-        return (ends_ok and 0 <= t <= 1) or 0 < t < 1, a[0] + (a[1] - a[0]) * t
-    # are the lines parallel but offset, parallel but not overlapping, or overlapping
-    return lines_overlap(a, b), None
+  /* \brief Find the intersection of two line segments
+   *
+   * An intersection point exists if the two line segments are not parallel. That intersection point is 'valid' if
+   * it is within *both* line segments.
    *
    * */
-
   template<class T, template<class> class A>
     std::pair<size_t, A<T>>
     intersection2d(const A<T>& va, const std::pair<ind_t, ind_t> & pa, const A<T> & vb, const std::pair<ind_t, ind_t> & pb, bool inclusive=true){
@@ -1126,6 +1121,8 @@ namespace polystar {
       auto r = va.view(pa.second) - p;
       auto q = vb.view(pb.first);
       auto s = vb.view(pb.second) - q;
+//      std::cout << "Does the line " << p.to_string(0) << "--" <<  va.view(pa.second).to_string(0);
+//      std::cout << "intersect the line " <<  q.to_string(0) << "--" << vb.view(pb.second);
       // solve p + t * r == q + u * s
       auto r_x_s = cross2d(r, s).val(0,0);
       auto qp = q - p;
@@ -1133,24 +1130,19 @@ namespace polystar {
         // the lines are parallel, check for overlap -- otherwise no intersection
         if (0 == cross2d(qp, r).val(0,0)){
           // lines are collinear
-          auto r2 = dot(r, r).val(0,0);
-          auto t0 = dot(qp, r).val(0,0) / r2;
-          auto sr = dot(s, r).val(0,0);
+          auto r2 = static_cast<double>(dot(r, r).val(0,0));
+          auto t0 = static_cast<double>(dot(qp, r).val(0,0)) / r2;
+          auto sr = static_cast<double>(dot(s, r).val(0,0));
           auto t1 = t0 + sr / r2;
           if (sr < 0) std::swap(t0, t1);
           auto st0{std::sqrt(t0)};
           auto st1{std::sqrt(t1)};
-          if (inclusive && ((t0 <= 0 && t1 >= 0) || (t0 >= 0 && t1 <= 1 && t1 > t0))) {
+          bool inside{(0 < t0 && t1 < 1 && t0 < t1) || (inclusive && (0 < t0 && t0 < 1 && t1 == 1))};
+          bool outside{(t0 < 0 && t1 > 1) || (inclusive && (t0 <= 0 && t1 >= 1))};
+          if (inside || outside) {
             // collinear *and* overlap
-            // this can cast double valued points to integer, which is not great.
             auto x0 = t0 <= 0 ? p : A<T>(p + st0 * r);
             auto x1 = t1 >= 1 ? p + r : A<T>(p + st1 * r);
-            return std::make_pair(2u, cat(0, x0, x1));
-          }
-          if (!inclusive && ((t0 < 0 && t1 > 0) || (t0 > 0 && t1 < 1 && t1 > t0))) {
-            // collinear *and* overlap
-            auto x0 = t0 < 0 ? p : A<T>(p + st0 * r);
-            auto x1 = t1 > 1 ? p + r : A<T>(p + st1 * r);
             return std::make_pair(2u, cat(0, x0, x1));
           }
         }
@@ -1158,11 +1150,15 @@ namespace polystar {
         return std::make_pair(0u, A<T>());
       }
       // not collinear, so they *do* intersect somewhere
-      auto t = cross2d(qp, s).val(0, 0) / r_x_s;
-      bool valid{true};
-      if ((!inclusive && (t == 0 || t == 1)) || (t < 0 || t > 1)) valid=false;
+      auto t = static_cast<double>(cross2d(qp, s).val(0, 0)) / static_cast<double>(r_x_s);
+      auto u = static_cast<double>(cross2d(qp, r).val(0, 0)) / static_cast<double>(r_x_s);
+      // always exclude 0 so that only one end of successive edges can be matched
+      bool t_valid{(0 < t && t < 1) || (inclusive && t == 1)};
+      bool u_valid{(0 < u && u < 1) || (inclusive && u == 1)};
+      bool valid{u_valid && t_valid};
       auto x  = p + t * r;
-      return std::make_pair(valid ? 1u : 0u, x);
+//      std::cout << "Their intersection " << (valid ? "is" : "is not") << " valid, t = " << t << " u = " << u << ", at " << x;
+      return std::make_pair(valid ? 1u : 0u, A<T>(x));
     }
 
   template<class T, template<class> class A>

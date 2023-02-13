@@ -47,8 +47,27 @@ void define_polygon(py::class_<A> & cls){
 //  cls.def_property_readonly("wires", [](const A& p){return a2py(p.wires().wires());});
   cls.def_property_readonly("area", &A::area);
   cls.def_property_readonly("mirror",&A::mirror);
+  cls.def_property_readonly("inverse",&A::inverse);
   cls.def_property_readonly("centroid",[](const A& p){return a2py(p.centroid());});
-//  cls.def("intersection",[](const A& p, const A& o){return p.intersection(o);});
+  cls.def("contains",[](const A& p, const py::array_t<T>& pyv){
+    auto v = py2a2(pyv);
+    return p.contains(v);
+  });
+  cls.def("translate",[](const A& p, const py::array_t<T>& pyv){
+    auto v = py2a2(pyv);
+    return p.translate(v);
+  });
+  cls.def("intersects",[](const A & p, const A & o){return p.intersects(o);});
+  cls.def("intersection",[](const A& p, const A& o){return p.intersection(o);});
+  cls.def("simplify",&A::simplify);
+  cls.def("triangulate",&A::triangulate);
+
+// overloaded operations:
+  cls.def("__eq__", [](const A& p, const A& o){return p == o;});
+  cls.def("__neq__", [](const A& p, const A& o){return p != o;});
+  cls.def("__add__", [](const A& p, const A& o){return p + o;});
+  cls.def("__add__", [](const A& p, const std::vector<A> & v){return p.combine_all(v);});
+
 }
 
 #endif

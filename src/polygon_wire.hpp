@@ -5,6 +5,7 @@
 #include <optional>
 #include <numeric>
 #include <limits>
+#include <list>
 
 #include "comparisons.hpp"
 #include "array_.hpp"
@@ -55,6 +56,12 @@ namespace polystar::polygon {
       }
     }
 
+    template<size_t N>
+    explicit Wire(const std::array<ind_t, N> w) {
+      reserve(N);
+      for (const auto & x: w) push_back(x);
+    }
+
     std::back_insert_iterator <base_t> appender() { return std::back_insert_iterator<base_t>(*this); }
 
     template<class T, template<class> class A>
@@ -72,6 +79,17 @@ namespace polystar::polygon {
       return true;
     }
 
+    bool operator==(const Wire & that) const {
+      return size() == that.size()
+          && std::is_permutation(begin(), end(), that.begin())
+          && is_positive_permutation(base_t(*this), base_t(that));
+    }
+    bool operator!=(const Wire & that) const {
+      return size() != that.size()
+          || !std::is_permutation(begin(), end(), that.begin())
+          || !is_positive_permutation(base_t(*this), base_t(that));
+    }
+
     bool shares_edge(const Wire& other, bool backwards_allowed = false) const {
       // in two dimensions any triangulated (or other-shape-ed) polygon will have internal edges
       // with the property that two shapes share opposite-vertex-ordered edges
@@ -85,35 +103,200 @@ namespace polystar::polygon {
     }
 
     template<class T, template<class> class A>
+      bool uses(const A<T> & point, const A<T> & x, const T tol = T(0), const int dig = 1) const {
+      for (const auto & i: *this) if (x.view(i).count(polystar::cmp::eq, point, tol, tol, dig) == 1) return true;
+      return false;
+    }
+
+    template<class T, template<class> class A>
     Network<T,A> triangulate(const A<T>& x) const {
-      // Use the ear-clipping method to triangulate this possibly-convex polygon
-      Wire remnants{*this};
-      std::vector<Wire> triangles;
-      std::vector<bool> unused(size(), true);
-      size_t i{0};
-      while (remnants.size() > 3) {
-        edge_t e{remnants[(i-1)%remnants.size()], remnants[(i+1)%remnants.size()]};
-        // If the new edge does not hit any edge in the remnants, and is inside of it
-        if (!remnants.intersects(x, e, x, false) && remnants.contains((x.view(e.first)+x.view(e.second))/T(2), x)) {
-          // (i, i+1, i-1) is a triangle in the triangulation
-          base_t tri{remnants.vi(i), e.second, e.first};
-          triangles.emplace_back(tri);
-          // the current point must be removed from the remnants -- and `i` now is the *next* triangle point to consider
-          remnants.erase(remnants.begin()+i);
-        } else {
-          // (i, i+1, i-1) not a triangle -- so move on
-          i++;
-        }
-        // and ensure we only consider in-bounds point indexes
-        i %= remnants.size();
+      using group_t = std::array<ind_t,3>;
+      std::vector<group_t> groups;
+      groups.reserve(size());
+      for (auto ptr = begin(); ptr != end(); ++ptr){
+        auto prev = ptr == begin() ? end() - 1 : ptr - 1;
+        auto next = ptr == end() - 1 ? begin() : ptr + 1;
+        groups.push_back(std::array<ind_t,3>({*prev, *ptr, *next}));
       }
-      if (remnants.size() == 3){
-        triangles.push_back(remnants);
-      } else {
-        throw std::runtime_error("Fewer than three points can not be triangulated");
+      std::vector<group_t> convex;
+      std::vector<group_t> concave;
+      for (const auto & g: groups){
+        if (cross2d(x.view(g[1]) - x.view(g[0]), x.view(g[2]) - x.view(g[1])).val(0,0) > 0){
+          convex.push_back(g);
+        } else {
+          concave.push_back(g);
+        }
+      }
+      std::vector<group_t> ears;
+
+      auto update_concave_convex = [&](const auto & g, const auto & ng){
+        // if g[1] was concave, it might not be any longer
+        if (auto cp = std::find(concave.begin(), concave.end(), g); cp != concave.end()){
+          if (cross2d(x.view(ng[1]) - x.view(ng[0]), x.view(ng[2]) - x.view(ng[1])).val(0,0) > 0) {
+            convex.push_back(ng);
+            concave.erase(cp);
+          } else {
+            // update the group membership
+            *cp = ng;
+          }
+        } else {
+          // the point remains convex but needs to have its indexing updated
+          auto xp = std::find(convex.begin(), convex.end(), g);
+          if (xp == convex.end()) throw std::runtime_error("Point was not convex but should have been");
+          *xp = ng;
+        }
+      };
+      auto update_ears = [&](const auto & ip, const auto & g, const auto & ng){
+        // this is called *after* update_convex_concave -- so we *must* check for ng in convex!
+        // if g[i] is convex, it might have changed ear-ness:
+        bool not_tri{ng[0] == ng[2]};
+        if (!not_tri && std::find(convex.begin(), convex.end(), ng) != convex.end()) {
+          auto tri = Wire(ng);
+//          std::cout << "Inner (concave) points" << ip;
+          auto cinc = tri.contains(ip, x, false);
+          // Complex polygons can visit the same point multiple times, and it may be concave once and convex another
+          for (ind_t i=0; i<ip.size(0); ++i) if (cinc[i] && tri.uses(ip.view(i), x)) cinc[i] = false;
+//          for (const auto & q: cinc) std::cout << (q ? "1" : "0");
+//          std::cout << "\n";
+          auto is_ear = std::count(cinc.begin(), cinc.end(), true) == 0;
+          auto ptr = std::find(ears.begin(), ears.end(), g);
+//          std::cout << "Old group (" << g[0] << " " << g[1]  << " " << g[2] << ") new group (";
+//          std::cout << ng[0] << " " << ng[1] << " " << ng[2] << ")";
+          if (!is_ear){
+            if (ptr != ears.end()) {
+              ears.erase(ptr);
+//              std::cout << " was an ear but no longer is\n";
+//            } else {
+//              std::cout << " remains a non-ear\n";
+            }
+          } else {
+            if (ptr == ears.end()) {
+              ears.push_back(ng);
+//              std::cout << " has become an ear\n";
+            } else {
+              *ptr = ng;
+//              std::cout << " remains an ear, and has its indexing updated\n";
+            }
+          }
+        }
+        // remove any non-triangular groups from ears
+        if (not_tri) if (auto ptr = std::find(ears.begin(), ears.end(), g); ptr != ears.end()) ears.erase(ptr);
+      };
+      std::vector<ind_t> middle;
+      middle.reserve(concave.size());
+      for (const auto & g: concave) middle.push_back(g[1]);
+      auto inner_points = x.extract(middle);
+      for (const auto & g: groups) update_ears(inner_points, g, g);
+
+      auto update_groups = [&](const auto & g, const auto & ng){
+        auto ptr = std::find(groups.begin(), groups.end(), g);
+        if (ptr == groups.end()) throw std::runtime_error("Group not found");
+//        std::cout << "Update group (" << g[0] << " " << g[1]  << " " << g[2] << ") to (";
+//        std::cout << ng[0] << " " << ng[1] << " " << ng[2] << ")\n";
+        *ptr = ng;
+      };
+
+
+      // now we only need to work with the known ears (and check the neighbors after removing each)
+      std::vector<Wire> triangles;
+      while (!ears.empty()){
+//        std::cout << "\nRemaining groups: ";
+//        for (const auto & e: groups) std::cout << "(" << e[0] << " " << e[1] << " " << e[2] << ") ";
+//        std::cout << "\nRemaining convex: ";
+//        for (const auto & e: convex) std::cout << "(" << e[0] << " " << e[1] << " " << e[2] << ") ";
+//        std::cout << "\nRemaining concave: ";
+//        for (const auto & e: concave) std::cout << "(" << e[0] << " " << e[1] << " " << e[2] << ") ";
+//        std::cout << "\nRemaining ear indexes: ";
+//        for (const auto & e: ears) std::cout << "(" << e[0] << " " << e[1] << " " << e[2] << ") ";
+//        std::cout << "\n";
+        // pick the first ear to be the first triangle, erase it from the ears at this point:
+        group_t i = ears.front();
+        ears.erase(ears.begin());
+        // find its group
+        auto ptr = std::find(groups.begin(), groups.end(), i);
+        //auto ptr = std::find_if(groups.begin(), groups.end(), [i](const std::array<ind_t,3> & g){return g[1] == i;});
+        if (ptr == groups.end()) {
+          std::cout << "Remaining groups do not have (" << i[0] << " " << i[1] << " " << i[2]  << ")? \n";
+          for (const auto & g: groups) std::cout << "(" << g[0] << " " << g[1] << " " << g[2]  << ")\n";
+          throw std::runtime_error("triangle indexing error");
+        }
+//        std::cout << "Selected is " << ptr->operator[](0) << " " << ptr->operator[](1) << " " << ptr->operator[](2) << "\n";
+        // construct the triangle
+        auto tri = Wire(*ptr);
+        triangles.push_back(tri);
+        // connect the neighbouring groups
+        auto p{*(ptr == groups.begin() ? groups.end() - 1 : ptr - 1)};
+        auto n{*(ptr == groups.end() - 1 ? groups.begin() : ptr + 1)};
+        group_t np{{p[0], p[1], n[1]}};
+        group_t nn{{p[1], n[1], n[2]}};
+//        std::cout << "Update {prev|next} from {";
+//        std::cout << p[0] << " " << p[1] << " " << p[2] << "|" << n[0] << " " << n[1] << " " << n[2] << "} to {";
+//        std::cout << np[0] << " " << np[1] << " " << np[2] << "|" << nn[0] << " " << nn[1] << " " << nn[2] << "}\n";
+
+        // check for change of concave-ness, updating the concave and convex lists
+        update_concave_convex(p, np);
+        update_concave_convex(n, nn);
+        // update the inner points subset of vertices
+        middle.clear();
+        middle.reserve(concave.size());
+        for (const auto & g: concave) middle.push_back(g[1]);
+        inner_points = x.extract(middle);
+        // (possibly) update the ears
+        update_ears(inner_points, p, np);
+        update_ears(inner_points, n, nn);
+        // update the groups:
+        update_groups(p, np);
+        update_groups(n, nn);
+        // the update calls above may have invalidated pointers, so find the group again
+        ptr = std::find(groups.begin(), groups.end(), i);
+        groups.erase(ptr);
+
       }
       return Network<T,A>(triangles, x);
     }
+
+//
+//      // Use the ear-clipping method to triangulate this possibly-convex polygon
+//      Wire remnants{*this};
+//
+//      std::vector<Wire> triangles;
+//      std::vector<bool> unused(size(), true);
+//      size_t i{0};
+//      size_t failures{0};
+//      while (remnants.size() > 3 && failures < 10 * remnants.size()) {
+//        // we want i-1 and i+1 but need to add size() *first* in the first case to avoid underflow at 0
+//        edge_t e{remnants[(i+remnants.size()-1)%remnants.size()], remnants[(i+1)%remnants.size()]};
+//        std::cout << "wire: ";
+//        for (const auto & r: remnants) std::cout << r << " ";
+//        std::cout << "\n try edge (" << e.first << "-" << e.second << ")\n";
+//        // If the new edge does not hit any edge in the remnants, and is inside of it
+//        const auto & ti{x.view(remnants[i])};
+//        const auto & t0{x.view(e.first)};
+//        const auto & t1{x.view(e.second)};
+//        if (!remnants.intersects(x, e, x, false) && cross2d(ti-t0, t1-ti).val(0,0) > 0) {
+//          std::cout << "Successful edge from " << t0.to_string(0) << " to " << t1.to_string(0);
+//          // (i, i+1, i-1) is a triangle in the triangulation
+//          base_t tri{remnants.vi(i), e.second, e.first};
+//          std::cout << " gives triangle " << remnants.vi(i) << ", " << e.second << ", " << e.first << "\n";
+//          triangles.emplace_back(tri);
+//          // the current point must be removed from the remnants -- and `i` now is the *next* triangle point to consider
+//          remnants.erase(remnants.begin()+i);
+//          failures = 0;
+//        } else {
+//          // (i, i+1, i-1) not a triangle -- so move on
+//          i++;
+//          failures++;
+//        }
+//        // and ensure we only consider in-bounds point indexes
+//        i %= remnants.size();
+//      }
+//      if (remnants.size() == 3){
+//        triangles.push_back(remnants);
+////      } else {
+////        throw std::runtime_error("Fewer than three points can not be triangulated");
+//      }
+//      return Network<T,A>(triangles, x);
+//    }
 
     template<class T, template<class> class A>
     T area(const A<T> &x) const {
@@ -141,17 +324,27 @@ namespace polystar::polygon {
     Wire mirror() const {
       auto out = Wire();
       out.reserve(size());
-      std::copy(crend(), crbegin(), std::back_insert_iterator<base_t>(out));
+      std::copy(crbegin(), crend(), std::back_insert_iterator<base_t>(out));
       return out;
     }
 
+    Wire inverse() const {
+      return mirror();
+    }
+
     template<class T, template<class> class A>
-    bool contains(const A<T> &point, const A<T> &x, bool inclusive=true) const {
-      auto segment = cat(0, point, (std::numeric_limits<T>::max)() + T(0) * point);
-      edge_t se{0, 1};
-      size_t crossings{0};
-      for (size_t i = 0; i < size(); ++i) if (intersect2d(segment, se, x, edge(i), inclusive)) ++crossings;
-      return (crossings % 2u) == 1u;
+    std::vector<bool> contains(const A<T> &point, const A<T> &x, bool inclusive=true) const {
+      std::vector<bool> out;
+      out.reserve(point.size(0));
+      auto x_max = 2 * x.max(0);
+      edge_t segment_edge{0, 1};
+      for (ind_t i=0; i<point.size(0); ++i){
+        auto segment = cat(0, point.view(i), x_max);
+        size_t crossings{0};
+        for (size_t j=0; j<size(); ++j) if (intersect2d(segment, segment_edge, x, edge(j), inclusive)) ++crossings;
+        out.push_back((crossings % 2u) == 1u);
+      }
+      return out;
     }
 
     template<class T, template<class> class A>

@@ -71,7 +71,20 @@ namespace polystar::polygon {
 
     Wires &operator=(const Wires &that) = default;
 
-    bool operator!=(const Wires &) const;
+    bool operator!=(const Wires & that) const {
+      if (border_ != that.border()) return true;
+      auto ow = that.wires();
+      if (wires_.has_value()) {
+        if (ow.size() != wires_.value().size()) return true;
+        size_t count{0};
+        for (const auto &w: wires_.value()) {
+          if (std::find_if(ow.begin(), ow.end(), [&](const auto &x) { return x == w; }) != ow.end()) count++;
+        }
+        return ow.size() != count;
+      }
+      // if that.wires is empty then they're the same
+      return !ow.empty();
+    }
 
     bool operator==(const Wires &that) const { return !this->operator!=(that); }
 
@@ -106,32 +119,46 @@ namespace polystar::polygon {
       auto ws = wires_.value();
       size_t failures{0u};
 
+      using p_t = typename wire_t::edge_t;
+      using pp_t = std::pair<p_t, p_t>;
+
       while (failures < ws.size()){
         auto w = ws[failures];
-        // find the joining edge:
-        // TODO Make this choose the *shortest* possible joining edge?
-        ind_t wi{0}, bi{0};
-        bool has_intersection{true};
-        for (; wi < w.size(); ++wi){
-          for (; bi < b.size(); ++bi){
-            typename wire_t::edge_t se{wi, bi};
-            has_intersection = intersects(vertices, se, vertices, false);
-            if (!has_intersection) break;
+        // find the possible joining edges
+        std::vector<pp_t> choices;
+        choices.reserve(w.size() * b.size());
+        for (ind_t i=0; i < w.size(); ++i){ for (ind_t j=0; j < b.size(); ++j){
+            p_t se{w[i], b[j]};
+            if (!intersects(vertices, se, vertices, false)) choices.emplace_back(std::make_pair(i, j), se);
           }
-          if (!has_intersection) break;
         }
-        if (has_intersection) {
+        if (choices.empty()) {
           ++failures;
         } else {
+          // pick *which* possible edge we want, maybe the shorted one is best?
+          std::vector<std::pair<double, pp_t>> lengths;
+          lengths.reserve(choices.size());
+          std::transform(choices.begin(), choices.end(), std::back_inserter(lengths), [&](const auto & ch){
+            return std::make_pair(norm(vertices.view(ch.second.first) - vertices.view(ch.second.second)).sum(), ch);
+          });
+//          std::cout << "possible edges:\n";
+//          for (const auto & [l, e]: lengths)
+//            std::cout << "[" << e.first.first << "][" << e.first.second << "]("
+//                      << e.second.first << "--" << e.second.second << ") " << l << "\n";
+
+          auto ptr = std::min_element(lengths.begin(), lengths.end(),
+                                      [](const auto & a, const auto & b){return a.first < b.first;});
+          auto best = ptr->second.first;
+//          std::cout << "best edge indexes: (" << best.first << "--" << best.second << ")\n";
           // Add the edge border[bi] -- wire[failures][wi]
           // The new border is b[:bi] -- w[wi:] -- w[:wi] -- b[bi:]
           // Where x[:n] means [0,n] {upper bound inclusive} and x[n:] means [n,x.size()) {upper bound exclusive}
           typename wire_t::base_t new_b;
           new_b.reserve(b.size() + w.size());
-          for (size_t i=0; i<std::min(static_cast<size_t>(bi+1), b.size()); ++i) new_b.push_back(b[i]);
-          for (size_t i=wi; i<w.size(); ++i) new_b.push_back(w[i]);
-          for (size_t i=0; i<std::min(static_cast<size_t>(wi+1), w.size()); ++i) new_b.push_back(w[i]);
-          for (size_t i=bi; i<b.size(); ++i) new_b.push_back(b[i]);
+          for (size_t i=0; i<std::min(static_cast<size_t>(best.second+1), b.size()); ++i) new_b.push_back(b[i]);
+          for (size_t i=best.first; i<w.size(); ++i) new_b.push_back(w[i]);
+          for (size_t i=0; i<std::min(static_cast<size_t>(best.first+1), w.size()); ++i) new_b.push_back(w[i]);
+          for (size_t i=best.second; i<b.size(); ++i) new_b.push_back(b[i]);
 
           // the border is now new_b
           b = Wire(new_b);
@@ -185,6 +212,10 @@ namespace polystar::polygon {
       w.reserve(wires_.has_value() ? wires_.value().size() : 0u);
       if (wires_.has_value()) for (const auto &w_: wires_.value()) w.push_back(w_.mirror());
       return wires_.has_value() ? Wires(b, w) : Wires(b);
+    }
+
+    [[nodiscard]] Wires inverse() const{
+      return mirror();
     }
 
     [[nodiscard]] wire_t::base_t indexes() const {
@@ -255,6 +286,12 @@ namespace polystar::polygon {
       return w.empty() ? Wires(b) : Wires(b, w);
     }
 
+    Wires insert_wire(const wire_t & w) const {
+      auto ws = wires_.has_value() ? wires_.value() : proto_t();
+      ws.push_back(w);
+      return Wires(border_, ws);
+    }
+
     template<class T, class R, template<class> class A,
       template<class> class B>
     std::tuple <A<T>, Wires>
@@ -307,16 +344,38 @@ namespace polystar::polygon {
       return os;
     }
 
-    template<class T, template<class> class A>
-    bool contains(const A<T> &point, const A<T> &x, bool inclusive=true) const {
-      auto segment = cat(0, point, (std::numeric_limits<T>::max)() + T(0) * point);
+    template<class T, template<class> class A, class R, template<class> class B>
+    std::vector<bool> border_contains(const B<R> &point, const A<T> &x, bool inclusive=true) const {
+      std::vector<bool> out;
+      out.reserve(static_cast<size_t>(point.size(0)));
       wire_t::edge_t se{0, 1};
-      size_t crossings{0};
-      for (size_t i = 0; i < border_.size(); ++i) if (intersect2d(segment, se, x, border_.edge(i), inclusive)) ++crossings;
-      if (wires_.has_value())
-        for (const auto &w: wires_.value())
-          for (size_t i = 0; i < w.size(); ++i) if (intersect2d(segment, se, x, w.edge(i), inclusive)) ++crossings;
-      return (crossings % 2u) == 1u;
+      for (ind_t p=0; p<point.size(0); ++p) {
+        auto segment = cat(0, point.view(p), T(2) * x.max(0));
+        size_t crossings{0};
+        for (size_t i = 0; i < border_.size(); ++i)
+          if (intersect2d(segment, se, x, border_.edge(i), inclusive)) ++crossings;
+        out.push_back((crossings % 2u) == 1u);
+      }
+      return out;
+    }
+
+    template<class T, template<class> class A, class R, template<class> class B>
+    std::vector<bool> contains(const B<R> &point, const A<T> &x, bool inclusive=true) const {
+      std::vector<bool> out;
+      out.reserve(static_cast<size_t>(point.size(0)));
+      wire_t::edge_t se{0, 1};
+      for (ind_t p=0; p<point.size(0); ++p) {
+        auto segment = cat(0, point.view(p), T(2) * x.max(0));
+        size_t crossings{0};
+        for (size_t i = 0; i < border_.size(); ++i)
+          if (intersect2d(segment, se, x, border_.edge(i), inclusive))
+            ++crossings;
+        if (wires_.has_value())
+          for (const auto &w: wires_.value())
+            for (size_t i = 0; i < w.size(); ++i) if (intersect2d(segment, se, x, w.edge(i), inclusive)) ++crossings;
+        out.push_back((crossings % 2u) == 1u);
+      }
+      return out;
     }
 
     template<class T, template<class> class A>
@@ -329,6 +388,11 @@ namespace polystar::polygon {
       if (wires_.has_value()) for (const auto w: wires_.value())
         if (w.contains(p0, ours, inclusive) && w.contains(p1, ours, inclusive)) return false;
       return true;
+    }
+
+    template<class R, class T, template<class> class B, template<class> class A>
+      Poly<T,A> intersection(const Poly<R,B> that, const A<T> & ours, const R tol=R(0), const int dig=1) const {
+
     }
 
 
@@ -360,6 +424,30 @@ namespace polystar::polygon {
     }
 #endif
   };
+
+  template<class T, template<class> class A>
+  std::enable_if_t<isArray<T,A>, std::tuple<A<T>, Wires>>
+  remove_duplicate_points_and_update_wire_indexing(const A<T>& points, const Wires & ws, const T tol=T(0), const int dig=1){
+    auto are_unique = points.is_unique(tol, dig);
+    if(std::find(are_unique.begin(), are_unique.end(), false) != are_unique.end()){
+      // find unique *existing* indexes
+      auto index = points.unique_idx(tol, dig);
+      // and update them to point into reduced, only unique, vertices
+      ind_t cnt{0};
+      for (ind_t j=0; j < points.size(0); ++j){
+        index[j] = are_unique[j] ? cnt++ : index[index[j]];
+      }
+      auto b = ws.border();
+      auto hs = ws.wires();
+      for (auto & x: b) x = index[x];
+      for (auto & h: hs) for (auto & x: h) x= index[x];
+      return std::make_tuple(points.extract(are_unique), Wires(b, hs));
+    }
+    return std::make_tuple(points, ws);
+  }
+
+  Wires remove_extraneous_wires(const Wires & ws);
+
 
 } // namespace polystar::polygon
 #endif

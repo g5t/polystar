@@ -808,6 +808,18 @@ subscript_ok(const std::vector<I>& subscript, const std::vector<I>& shape){
     return false;
   }
 
+  template<class T, class OnPred, class OffPred>
+  bool is_cyclic_contiguous(T first, T last, OnPred on_pred, OffPred off_pred){
+    size_t on_count{0}, off_count{0};
+    for (T ptr = first; ptr != last; ++ptr){
+      T next = ptr + 1;
+      if (next == last) next = first;
+      if (on_pred(*ptr, *next)) on_count++;
+      if (off_pred(*ptr, *next)) off_count++;
+    }
+    return on_count < 2 && off_count < 2;
+  }
+
 } // namespace polystar
 
 

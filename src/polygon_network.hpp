@@ -15,19 +15,6 @@ namespace polystar::polygon {
   template<class T, template<class> class A> class Poly;
   Wire wire_merge(const Wire &, const Wire &);
 
-//  template<class C, class P>
-//  size_t erase_if(C c, P pred){
-//    auto old_size = c.size();
-//    for (auto i = c.begin(), last = c.end(); i != last; ) {
-//      if (pred(*i)) {
-//        i = c.erase(i);
-//      } else {
-//        ++i;
-//      }
-//    }
-//    return old_size - c.size();
-//  }
-
   template<class T, template<class> class A>
   class Network {
   public:
@@ -87,6 +74,19 @@ namespace polystar::polygon {
     }
 
     bool simplify();
+
+    vertex_t path(const vertex_t & from, const vertex_t & to) const {
+      /* 1. Find the ending poylygon
+       * 2. Perform a search until the start is found
+       * 3. Remove extraneous points on the path
+       *    (if the path is A-B-C-..., and A-C intersects the edge containing B, B is extraneous
+       */
+      auto out = from.decouple();
+      // add all the intervening points
+      // add the final point:
+      out = cat(0, out, to);
+      return out;
+    }
   };
 }
 
