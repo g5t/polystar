@@ -129,7 +129,7 @@ namespace polystar::polygon {
         choices.reserve(w.size() * b.size());
         for (ind_t i=0; i < w.size(); ++i){ for (ind_t j=0; j < b.size(); ++j){
             p_t se{w[i], b[j]};
-            if (!intersects(vertices, se, vertices, false)) choices.emplace_back(std::make_pair(i, j), se);
+            if (!intersects(vertices, se, vertices, end_type::neither)) choices.emplace_back(std::make_pair(i, j), se);
           }
         }
         if (choices.empty()) {
@@ -183,7 +183,7 @@ namespace polystar::polygon {
 
 
     template<class T, template<class> class A>
-      bool intersects(const A<T>& other, const typename wire_t::edge_t edge, const A<T> & ours, bool inclusive=true) const {
+      bool intersects(const A<T>& other, const typename wire_t::edge_t edge, const A<T> & ours, end_type inclusive = end_type::both) const {
       if (border_.intersects(other, edge, ours, inclusive)) return true;
       if (wires_.has_value()) for (const auto & w: wires_.value()) if (w.intersects(other, edge, ours, inclusive)) return true;
       // no intersection ... but the edge could be *inside* the border (... and not inside a hole) -- push this to another function
@@ -345,7 +345,7 @@ namespace polystar::polygon {
     }
 
     template<class T, template<class> class A, class R, template<class> class B>
-    std::vector<bool> border_contains(const B<R> &point, const A<T> &x, bool inclusive=true) const {
+    std::vector<bool> border_contains(const B<R> &point, const A<T> &x, end_type inclusive = end_type::second) const {
       std::vector<bool> out;
       out.reserve(static_cast<size_t>(point.size(0)));
       wire_t::edge_t se{0, 1};
@@ -360,7 +360,7 @@ namespace polystar::polygon {
     }
 
     template<class T, template<class> class A, class R, template<class> class B>
-    std::vector<bool> contains(const B<R> &point, const A<T> &x, bool inclusive=true) const {
+    std::vector<bool> contains(const B<R> &point, const A<T> &x, end_type inclusive = end_type::second) const {
       std::vector<bool> out;
       out.reserve(static_cast<size_t>(point.size(0)));
       wire_t::edge_t se{0, 1};
@@ -379,7 +379,7 @@ namespace polystar::polygon {
     }
 
     template<class T, template<class> class A>
-    bool overlaps(const A<T>& other, const typename wire_t::edge_t edge, const A<T>& ours, bool inclusive=true) const {
+    bool overlaps(const A<T>& other, const typename wire_t::edge_t edge, const A<T>& ours, end_type inclusive = end_type::both) const {
       // whether the edge crosses through this polygon *or* either end is *inside* the polygon without being in a hole
       if (intersects(other, edge, ours)) return true;
       const auto p0{other.view(edge.first)};

@@ -1114,9 +1114,12 @@ namespace polystar {
    * it is within *both* line segments.
    *
    * */
+  enum class end_type {both, first, second, neither};
+
   template<class T, template<class> class A>
     std::pair<size_t, A<T>>
-    intersection2d(const A<T>& va, const std::pair<ind_t, ind_t> & pa, const A<T> & vb, const std::pair<ind_t, ind_t> & pb, bool inclusive=true){
+    intersection2d(const A<T>& va, const std::pair<ind_t, ind_t> & pa,
+                   const A<T> & vb, const std::pair<ind_t, ind_t> & pb, end_type inclusive = end_type::both){
       auto p = va.view(pa.first);
       auto r = va.view(pa.second) - p;
       auto q = vb.view(pb.first);
@@ -1126,6 +1129,8 @@ namespace polystar {
       // solve p + t * r == q + u * s
       auto r_x_s = cross2d(r, s).val(0,0);
       auto qp = q - p;
+      bool lok{inclusive == end_type::both || inclusive == end_type::first};
+      bool rok{inclusive == end_type::both || inclusive == end_type::second};
       if (r_x_s == 0) {
         // the lines are parallel, check for overlap -- otherwise no intersection
         if (0 == cross2d(qp, r).val(0,0)){
@@ -1137,8 +1142,8 @@ namespace polystar {
           if (sr < 0) std::swap(t0, t1);
           auto st0{std::sqrt(t0)};
           auto st1{std::sqrt(t1)};
-          bool inside{(0 < t0 && t1 < 1 && t0 < t1) || (inclusive && (0 < t0 && t0 < 1 && t1 == 1))};
-          bool outside{(t0 < 0 && t1 > 1) || (inclusive && (t0 <= 0 && t1 >= 1))};
+          bool inside{(0 < t0 && t1 < 1 && t0 < t1) || (lok && (0 < t0 && t0 < 1 && t1 == 1))};
+          bool outside{(t0 < 0 && t1 > 1) || (rok && (t0 <= 0 && t1 >= 1))};
           if (inside || outside) {
             // collinear *and* overlap
             auto x0 = t0 <= 0 ? p : A<T>(p + st0 * r);
@@ -1153,8 +1158,8 @@ namespace polystar {
       auto t = static_cast<double>(cross2d(qp, s).val(0, 0)) / static_cast<double>(r_x_s);
       auto u = static_cast<double>(cross2d(qp, r).val(0, 0)) / static_cast<double>(r_x_s);
       // always exclude 0 so that only one end of successive edges can be matched
-      bool t_valid{(0 < t && t < 1) || (inclusive && t == 1)};
-      bool u_valid{(0 < u && u < 1) || (inclusive && u == 1)};
+      bool t_valid{(0 < t && t < 1) || (lok && t == 1)};
+      bool u_valid{(0 < u && u < 1) || (rok && u == 1)};
       bool valid{u_valid && t_valid};
       auto x  = p + t * r;
 //      std::cout << "Their intersection " << (valid ? "is" : "is not") << " valid, t = " << t << " u = " << u << ", at " << x;
@@ -1164,7 +1169,7 @@ namespace polystar {
   template<class T, template<class> class A>
     bool intersect2d(const A<T> & va, const std::pair<ind_t, ind_t> & pa,
                      const A<T> & vb, const std::pair<ind_t, ind_t> & pb,
-                     bool inclusive=true){
+                     end_type inclusive = end_type::both){
       auto i2d = intersection2d(va, pa, vb, pb, inclusive);
       return 0 < i2d.first;
     }

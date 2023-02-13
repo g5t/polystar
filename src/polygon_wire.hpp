@@ -153,7 +153,7 @@ namespace polystar::polygon {
         if (!not_tri && std::find(convex.begin(), convex.end(), ng) != convex.end()) {
           auto tri = Wire(ng);
 //          std::cout << "Inner (concave) points" << ip;
-          auto cinc = tri.contains(ip, x, false);
+          auto cinc = tri.contains(ip, x, end_type::neither);
           // Complex polygons can visit the same point multiple times, and it may be concave once and convex another
           for (ind_t i=0; i<ip.size(0); ++i) if (cinc[i] && tri.uses(ip.view(i), x)) cinc[i] = false;
 //          for (const auto & q: cinc) std::cout << (q ? "1" : "0");
@@ -333,7 +333,7 @@ namespace polystar::polygon {
     }
 
     template<class T, template<class> class A>
-    std::vector<bool> contains(const A<T> &point, const A<T> &x, bool inclusive=true) const {
+    std::vector<bool> contains(const A<T> &point, const A<T> &x, end_type inclusive = end_type::second) const {
       std::vector<bool> out;
       out.reserve(point.size(0));
       auto x_max = 2 * x.max(0);
@@ -348,7 +348,7 @@ namespace polystar::polygon {
     }
 
     template<class T, template<class> class A>
-    bool intersects(const A<T> &other, const edge_t &oe, const A<T> &x, bool inclusive=true) const {
+    bool intersects(const A<T> &other, const edge_t &oe, const A<T> &x, end_type inclusive = end_type::both) const {
       for (size_t i = 0; i < size(); ++i) if (intersect2d(other, oe, x, edge(i), inclusive)) return true;
       return false;
     }
