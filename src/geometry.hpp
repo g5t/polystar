@@ -1119,7 +1119,8 @@ namespace polystar {
   template<class T, template<class> class A>
     std::pair<size_t, A<T>>
     intersection2d(const A<T>& va, const std::pair<ind_t, ind_t> & pa,
-                   const A<T> & vb, const std::pair<ind_t, ind_t> & pb, end_type inclusive = end_type::both){
+                   const A<T> & vb, const std::pair<ind_t, ind_t> & pb,
+                   end_type inclusive = end_type::both){
       auto p = va.view(pa.first);
       auto r = va.view(pa.second) - p;
       auto q = vb.view(pb.first);
@@ -1162,7 +1163,11 @@ namespace polystar {
       bool u_valid{(0 < u && u < 1) || (rok && u == 1)};
       bool valid{u_valid && t_valid};
       auto x  = p + t * r;
-//      std::cout << "Their intersection " << (valid ? "is" : "is not") << " valid, t = " << t << " u = " << u << ", at " << x;
+//      if (verbose && valid)
+//        std::cout << "\nintersection between " << p.to_string(0) << " + t * " << r.to_string(0)
+//                  << " and " <<  q.to_string(0) << " + u * " << s.to_string(0)
+//                  << " is valid, t = " << t << " u = " << u << ",\n at "
+//                  << x.to_string(0) << (q + u * s).to_string(0) << "\n";
       return std::make_pair(valid ? 1u : 0u, A<T>(x));
     }
 

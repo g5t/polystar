@@ -63,4 +63,20 @@ def board():
     board = CoordinatePolygon(np.array([[0, 0], [0,300], [300, 300], [300, 0]], dtype='int'))
     return board + holes
 
+def polylineplot(pl, *args, **kwargs):
+    import matplotlib.pyplot as pp
+    pp.plot(pl[:,0], pl[:,1], *args, **kwargs)
+
+def polyplot(p, indexes=False):
+    import matplotlib.pyplot as pp
+    b = p.border
+    b.append(b[0])
+    polylineplot(p.vertices[b])
+    for w in p.wires:
+        w.append(w[0])
+        polylineplot(p.vertices[w])
+    if indexes:
+        for i, x in enumerate(p.vertices):
+            pp.text(*x, f'{i}')
+
 

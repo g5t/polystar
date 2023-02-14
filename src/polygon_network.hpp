@@ -18,8 +18,8 @@ namespace polystar::polygon {
     template<class wire_t>
   class NetworkCost {
   public:
-      using cost_t = std::pair<double, double>;
-      using path_t = std::pair<std::vector<ind_t>, std::vector<ind_t>>;
+      using cost_t = double;
+      using path_t = std::vector<ind_t>;
       using elem_t = std::pair<cost_t, path_t>;
       using map_t = std::map<wire_t, elem_t>;
   private:
@@ -40,10 +40,7 @@ namespace polystar::polygon {
               const auto & [w, z] = *ptr;
               return z;
           }
-          return std::make_pair(
-            std::make_pair<double, double>(-1, -1),
-            std::make_pair(std::vector<ind_t>(), std::vector<ind_t>())
-            );
+          return std::make_pair<cost_t, path_t>(-1, path_t());
       }
       const elem_t & operator[](const wire_t & w) const {return map_[w];}
       elem_t & operator[](const wire_t & w) {return map_[w];}
@@ -53,7 +50,8 @@ namespace polystar::polygon {
   class Network {
   public:
     using wire_t = std::shared_ptr<Wire>;
-    using list_t = std::vector<std::weak_ptr<Wire>>;
+    using ref_t = std::weak_ptr<Wire>;
+    using list_t = std::vector<ref_t>;
     using map_t = std::map<wire_t, list_t>;
     using vertex_t = A<T>;
     using edge_t = std::pair<ind_t, ind_t>;
@@ -117,20 +115,18 @@ namespace polystar::polygon {
 
     std::optional<wire_t> containing_wire(const vertex_t & x) const;
 
-    bool simplify();
+    Network<T,A> simplify();
 
-    bool search_path(NetworkCost<wire_t> & costs, std::vector<wire_t>&  border, wire_t goal, const A<T>& in_first) const {
+    bool search_path(NetworkCost<wire_t> & costs, list_t border, wire_t goal, const A<T>& in_first) const {
         while (!border.empty()){
             // find the cheapest border polygon
             std::partial_sort(border.begin(), border.begin()+1, border.end(),
                               [&](const auto & a, const auto & b) -> bool {
-                auto a_cost = costs[a];
-                auto b_cost = costs[b];
-                if (a_cost.first.second <= b_cost.first.first) return true;
-                if (a_cost.first.first >= b_cost.first.second) return false;
-                return a_cost.first.first < b_cost.first.first;
+                auto a_cost = costs[a.lock()];
+                auto b_cost = costs[b.lock()];
+                return (a_cost.first < b_cost.first);
             });
-            const auto cbp{border.front()};
+            const auto cbp{border.front().lock()};
             // shortcut once we've reached the goal polygon with a cost
             if (goal == cbp) return true;
             // remove the cheapest from the border
@@ -150,39 +146,23 @@ namespace polystar::polygon {
                 auto edge = common_edge(cbp, n.lock());
                 auto e0 = vertices_.view(edge.first);
                 auto e1 = vertices_.view(edge.second);
-                double closest{-1}, farthest{-1};
                 // figure out the range of costs to move to the extremes of the edge.
-                if (cp.first.empty() || cp.second.empty()){
-                    // we're in the first polygon -- calculate distances from in_first to the edge points
-                    auto d0 = norm(e0 - in_first).sum();
-                    auto d1 = norm(e1 - in_first).sum();
-                    closest = std::min(d0, d1);
-                    farthest = std::max(d0, d1);
-                } else {
-                  auto c0 = vertices_.view(cp.first.back());
-                  auto c1 = vertices_.view(cp.second.back());
-                  auto d00 = norm(e0 - c0).sum();
-                  auto d01 = norm(e0 - c1).sum();
-                  auto d10 = norm(e1 - c0).sum();
-                  auto d11 = norm(e1 - c1).sum();
-                  closest = std::min(std::min(d00, d01), std::min(d10, d11));
-                  farthest = std::max(std::max(d00, d01), std::max(d10, d11));
-                }
+                auto d0 =  cp.empty() ? norm(e0 - in_first).sum() : norm(e0 - vertices_.view(cp.back())).sum();
+                auto d1 =  cp.empty() ? norm(e1 - in_first).sum() : norm(e1 - vertices_.view(cp.back())).sum();
                 // the cost information then is ...
-                std::vector<ind_t> short_path, long_path;
-                short_path.reserve(cp.first.size()+1);
-                long_path.reserve(cp.second.size()+1);
-                std::copy(cp.first.begin(), cp.first.end(), std::back_inserter(short_path));
-                std::copy(cp.second.begin(), cp.second.end(), std::back_inserter(long_path));
-                short_path.push_back(edge.first);
-                long_path.push_back(edge.second);
-                auto cost_range = std::make_pair(cc.first + closest, cc.second + farthest);
-                auto cost_info = std::make_pair(cost_range, std::make_pair(short_path, long_path));
+                std::vector<ind_t> path;
+                path.reserve(cp.size()+1);
+                std::copy(cp.begin(), cp.end(), std::back_inserter(path));
+                path.push_back(d0 < d1 ? edge.first : edge.second);
+                auto cost_info = std::make_pair(std::min(d0, d1), path);
                 // store the cost to get to n
                 if (auto nl=n.lock()) if (!costs.known(nl)) /* always true due to the filter above */ {
                   costs[nl] = cost_info;
-                  // and add the polygon to the border
-                  if (std::find(border.begin(), border.end(), nl) == border.end()) border.push_back(nl);
+                  // and add the weak_ptr to the border
+                  if (std::find_if(border.begin(), border.end(), [&](const auto & b){
+                    if (auto bl = b.lock()) return bl == nl;
+                    return false;
+                  }) == border.end()) border.push_back(n);
                 }
             }
         }
@@ -197,51 +177,34 @@ namespace polystar::polygon {
       if (!first.has_value() || !last.has_value()) return from;
 
       NetworkCost<wire_t> costs;
-      std::vector<wire_t> border{first.value()};
-      std::pair<double,double> distances{0, 0};
-      std::pair<std::vector<ind_t>, std::vector<ind_t>> empty_paths{{},{}};
-      costs[first.value()] = std::make_pair(distances, empty_paths);
+      list_t border;
+      border.emplace_back(first.value()); // make a weak_ptr from the shared_ptr
+      costs[first.value()] = std::make_pair<double, std::vector<ind_t>>(0, {});
       auto success = search_path(costs, border, last.value(), to);
 
       if (!success) std::cout << "No connection between points?\n";
 
-      auto paths = costs[last.value()].second;
+      auto path = costs[last.value()].second;
       auto out = from.decouple();
 
-      auto skip_to = [&](const size_t i, edge_t e){
-        std::vector<std::pair<size_t, bool>> skip;
-        skip.reserve(i);
-        for (size_t j=i; j-->0;){
-          auto pts = cat(0, out.view(out.size(0)-1), vertices_.view(paths.first[j]), vertices_.view(paths.second[j]));
-          skip.emplace_back(j, contains(pts, e));
-        }
-        auto ptr = std::find_if(skip.rbegin(), skip.rend(), [](const auto & s){return s.second;});
-        return ptr != skip.rend() ? ptr->first : i;
-      };
+      std::cout << "found vertex index path ";
+      for (const auto & p: path) std::cout << p << ", ";
+      std::cout << "\n";
 
       // cost_info is pair<pair<double, double>, pair<vector<ind_t>, vector<ind_t>>>
       // the vectors contain the edge-pair vertex indices in reverse order for the path that should be taken.
 
-      std::pair<ind_t, ind_t> edge_left{0,1}, edge_right{0,2};
-      for (size_t i=paths.first.size(); i-->0;) {
+      edge_t edge{0,1};
+      for (size_t i=path.size(); i-->0;) {
         // try to skip all the way to the end from here
         auto pg = cat(0, out.view(out.size(0) - 1), to);
-        if (!contains(pg, edge_left)) {
-          // only add points in the event to the end wasn't possible
-          if (i == 0) {
-            // pick the shorter path to the next edge?
-            out = cat(0, out, vertices_.view(paths.first[i]));
-          } else {
-            // try to skip over as many edges as we can
-            bool is_left{false};
-            if (auto j = skip_to(i, edge_left); j < i){
-              i = j;
-              is_left = true;
-            } else {
-              i = skip_to(i, edge_right);
-            }
-            out = cat(0, out, vertices_.view(is_left ? paths.first[i] : paths.second[i]));
-          }
+        // only add points in the event to the end wasn't possible
+        if (!contains(pg, edge)) {
+          std::cout << "We didn't skip to the end\n";
+          // try to skip over as many edges as we can
+          i = skip_to(out, i, path);
+          std::cout << "next point " << i << " is " << path[i] << "\n";
+          out = cat(0, out, vertices_.view(path[i]));
         }
       }
       // whether we managed to skip any points, add the final point:
@@ -250,12 +213,39 @@ namespace polystar::polygon {
     }
 
   private:
+    size_t skip_to(A<T>& far, const size_t i, const std::vector<ind_t>& path) const {
+      std::cout << "skip_to with i=" << i << "\n";
+      if (i==0) return i;
+      std::vector<std::pair<size_t, bool>> skip;
+      skip.reserve(i);
+      edge_t e{0, 1};
+      for (size_t j=i; j-->0;){
+        auto pts = cat(0, far.view(far.size(0)-1), vertices_.view(path[j]));
+        skip.emplace_back(j, contains(pts, e));
+      }
+      std::cout << "skip: ";
+      for (const auto & p: skip) std::cout << p.first << ":" << (p.second ? "T" : "F") << " ";
+      std::cout << "\n";
+      // we can iterate forwards through skip because we constructed it backwards
+      auto ptr = std::find_if(skip.begin(), skip.end(), [](const auto & s){return s.second;});
+      return ptr != skip.end() ? ptr->first : i;
+    }
     edge_t common_edge(const wire_t & asp, const wire_t & bsp) const ;
     template<class R>
     bool contains(A<R>& points, const std::pair<ind_t, ind_t> & edge) const {
       // check that the edge does not cross any *EXTERNAL* edges of the network
-      for (const auto & ee: external_) if (intersect2d(points, edge, vertices_, ee, end_type::neither)) return false;
-      return true;
+//      std::cout << "Does the edge " << edge.first << "--" << edge.second << " in\n" << points;
+//      std::cout << " intersect with any of ";
+//      for (const auto & ee: external_) std::cout << ee.first << "--" << ee.second << ", ";
+//      std::cout << "in\n" << vertices_;
+      bool contained{true};
+      for (const auto & ee: external_) {
+        if (intersect2d(points, edge, vertices_, ee, end_type::neither)) {
+          contained = false;
+        }
+      }
+//      std::cout << " " << (contained ? "no" : "yes") << "\n";
+      return contained;
     }
     void find_external_edges() {
       external_.clear();
