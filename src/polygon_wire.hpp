@@ -153,7 +153,8 @@ namespace polystar::polygon {
         if (!not_tri && std::find(convex.begin(), convex.end(), ng) != convex.end()) {
           auto tri = Wire(ng);
 //          std::cout << "Inner (concave) points" << ip;
-          auto cinc = tri.contains(ip, x, end_type::neither);
+//          auto cinc = tri.contains(ip, x, end_type::neither);
+          auto cinc = tri.contains(ip, x);
           // Complex polygons can visit the same point multiple times, and it may be concave once and convex another
           for (ind_t i=0; i<ip.size(0); ++i) if (cinc[i] && tri.uses(ip.view(i), x)) cinc[i] = false;
 //          for (const auto & q: cinc) std::cout << (q ? "1" : "0");
@@ -333,16 +334,50 @@ namespace polystar::polygon {
     }
 
     template<class T, template<class> class A>
-    std::vector<bool> contains(const A<T> &point, const A<T> &x, end_type inclusive = end_type::second) const {
+    std::vector<bool> contains(const A<T> & point, const A<T> & x) const{
+      auto wn = winding_number(point, x);
       std::vector<bool> out;
+      out.reserve(wn.size());
+      std::transform(wn.begin(), wn.end(), std::back_inserter(out), [](const auto & x){return x!=0;});
+      return out;
+    }
+
+    template<class T, template<class> class A>
+    std::vector<size_t> winding_number(const A<T> & point, const A<T> & x) const {
+      std::vector<size_t> out;
+      out.reserve(point.size(0));
+      for (ind_t i=0; i<point.size(0); ++i) {
+        size_t wn{0};
+        for (size_t j=0; j<size(); ++j){
+          auto e = edge(j);
+          // points are all (x, y)
+          if (x.val(e.first, 1) <= point.val(i, 1)) {
+            if(x.val(e.second, 1) > point.val(i, 1)) {
+              // upwards crossing with infinite horizontal line from point
+              if (cross2d(x.view(e.second) - x.view(e.first), point.view(i) - x.view(e.first)).sum() > 0) ++wn;
+            }
+          } else {
+            if (x.val(e.second, 1) <= point.val(i, 1)) {
+              if (cross2d(x.view(e.second) - x.view(e.first), point.view(i) - x.view(e.first)).sum() < 0) --wn;
+            }
+          }
+        }
+        out.push_back(wn);
+      }
+      return out;
+    }
+
+    template<class T, template<class> class A>
+    std::vector<size_t> crossing_number(const A<T> &point, const A<T> &x, end_type inclusive = end_type::second, bool verbose=false) const {
+      std::vector<size_t> out;
       out.reserve(point.size(0));
       auto x_max = 2 * x.max(0);
       edge_t segment_edge{0, 1};
       for (ind_t i=0; i<point.size(0); ++i){
         auto segment = cat(0, point.view(i), x_max);
         size_t crossings{0};
-        for (size_t j=0; j<size(); ++j) if (intersect2d(segment, segment_edge, x, edge(j), inclusive)) ++crossings;
-        out.push_back((crossings % 2u) == 1u);
+        for (size_t j=0; j<size(); ++j) if (intersect2d(segment, segment_edge, x, edge(j), inclusive, verbose)) ++crossings;
+        out.push_back(crossings);
       }
       return out;
     }
