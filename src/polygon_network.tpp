@@ -105,62 +105,6 @@ bool would_be_convex(const W & a, const std::shared_ptr<W> b, const A<T>& x){
   return is_convex(va) && is_convex(vb);
 }
 
-//template<class T, template<class> class A>
-//bool polystar::polygon::Network<T,A>::simplify() {
-//  std::vector<wire_t> merged_away;
-//  auto is_in = [](const auto & v, const auto & x){
-//    return std::find(v.begin(), v.end(), x) != v.end();
-//  };
-//  auto weak_is_in = [](const auto & v, const auto & x){
-//    auto xl = x.lock();
-//    if (!xl) return false;
-//    return std::find_if(v.begin(), v.end(), [&](const auto & y){return y.lock() == xl;}) != v.end();
-//  };
-//  auto remove_and_replace = [&](const auto & o, const auto & remove, const auto & replace){
-//    if (auto ol = o.lock()) {
-//      auto l = map_[ol];
-//      l.erase(std::remove_if(l.begin(), l.end(), [&](const auto &x) { return x.lock() == remove; }), l.end());
-//      l.emplace_back(replace);
-//    }
-//  };
-//  for (auto ptr = map_.begin(); ptr != map_.end(); ++ptr){
-//    auto & [w, l] = *ptr;
-//    // skip this one if it has already been merged into another
-//    if (is_in(merged_away, w)) continue;
-//    // try combining this wire with its connected wires
-//    for (const auto & t: l) if (auto tp=t.lock()) if (!is_in(merged_away, tp)) if (would_be_convex(w, tp, vertices_)){
-//      auto merged = polystar::polygon::wire_merge(*(w.get()), *(tp.get()));
-//      // We can combine the wires -- which requires combining their connected lists too
-//      auto wl = map_[w];
-//      auto tl = map_[tp];
-//      std::copy_if(tl.begin(), tl.end(), std::back_inserter(wl), [&](const auto & x){return !weak_is_in(wl, x);});
-//      // Keep pointers to the now-merged wires, so we don't attempt to merge them again
-//      merged_away.push_back(w);
-//      merged_away.push_back(tp);
-//      // go through the connections to this wire *and* that wire, remove pointers to the pre-merged wires
-//      auto new_w = std::make_shared<Wire>(merged);
-//      std::for_each(wl.begin(), wl.end(), [&](const auto & x){remove_and_replace(x, w, new_w);});
-//      std::for_each(tl.begin(), tl.end(), [&](const auto & x){remove_and_replace(x, tp, new_w);});
-//      // remove the reference to the other wire from this list
-//      wl.erase(std::remove_if(wl.begin(), wl.end(), [&](const auto & x){return x.lock()==tp;}), wl.end());
-//      // remove the other wire and its reference list from the map
-//      erase_wire(tp);
-//      // add the new wire with the merged result
-//      map_[new_w] = wl;
-//    }
-//  }
-//  // remove the merged polygons
-//  for (auto ptr = map_.begin(), last = map_.end(); ptr != last; ){
-//    const auto & [p, l] = *ptr;
-//    if (is_in(merged_away, p)) {
-//      ptr = map_.erase(ptr);
-//    } else {
-//      ++ptr;
-//    }
-//  }
-//  return !merged_away.empty();
-//}
-
 template<class T, template<class> class A>
 polystar::polygon::Network<T,A> polystar::polygon::Network<T,A>::simplify() {
   std::vector<wire_t> merged_away;
@@ -191,7 +135,7 @@ template<class T, template<class> class A>
 std::optional<typename polystar::polygon::Network<T,A>::wire_t>
   polystar::polygon::Network<T,A>::containing_wire(const typename polystar::polygon::Network<T,A>::vertex_t & x) const {
     for (const auto & [w, l]: map_) {
-      auto x_in = w->contains(x, vertices_, end_type::second);
+      auto x_in = w->contains(x, vertices_);
       if (std::find(x_in.begin(), x_in.end(), false) == x_in.end()) return std::make_optional(w);
     }
     return std::nullopt;
