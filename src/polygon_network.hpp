@@ -8,38 +8,6 @@
 #include "graph.hpp"
 
 namespace polystar::polygon {
-
-//  template<class wire_t>
-//  class NetworkCost {
-//  public:
-//      using cost_t = double;
-//      using path_t = std::vector<ind_t>;
-//      using elem_t = std::pair<cost_t, path_t>;
-//      using map_t = std::map<wire_t, elem_t>;
-//  private:
-//      map_t map_;
-//  public:
-//      bool known(wire_t p) const {
-//          return std::find_if(map_.begin(), map_.end(), [p](const auto & x){
-//              const auto & [w, z] = x;
-//              return p == w;
-//          }) != map_.end();
-//      }
-//      elem_t cost(wire_t p) const {
-//          auto ptr = std::find_if(map_.begin(), map_.end(), [p](const auto & x){
-//              const auto & [w, z] = x;
-//              return p == w;
-//          });
-//          if (ptr != map_.end()) {
-//              const auto & [w, z] = *ptr;
-//              return z;
-//          }
-//          return std::make_pair<cost_t, path_t>(-1, path_t());
-//      }
-//      const elem_t & operator[](const wire_t & w) const {return map_[w];}
-//      elem_t & operator[](const wire_t & w) {return map_[w];}
-//  };
-
   template<class W, class T, template<class> class A>
   class Network {
   public:
@@ -89,16 +57,6 @@ namespace polystar::polygon {
       return w;
     }
     vertex_t vertices() const {return vertices_;}
-
-//    std::vector<Poly<T,A>> polygons() const {
-//      std::vector<Poly<T,A>> p;
-//      p.reserve(size());
-//      for (const auto & w: wires()) {
-//        auto ws = Wires(w);
-//        p.emplace_back(vertices_, ws);
-//      }
-//      return p;
-//    }
 
     size_t erase_wire(wire_t w){
       auto old_size = map_.size();
@@ -185,7 +143,110 @@ namespace polystar::polygon {
       return out;
     }
 
+    /** \brief Find all paths and their costs from one vertex to many vertices
+     * */
+      std::vector<std::pair<double, vertex_t>> path_to_each(const vertex_t & from, const vertex_t & to) const {
+        auto first = containing_wire(from);
+        std::vector<std::optional<wire_t>> destinations;
+        destinations.reserve(to.size(0));
+        for (ind_t i=0; i<to.size(0); ++i) destinations.push_back(containing_wire(to.view(i)));
+        if (!first.has_value()) {
+          std::vector<std::pair<double, vertex_t>> no_paths;
+          no_paths.reserve(to.size(0));
+          for (ind_t i=0; i<to.size(0); ++i) no_paths.emplace_back((std::numeric_limits<double>::max)(), vertex_t());
+          return no_paths;
+        }
+        auto no_v = vertices_.size(0);
+        auto graph = graph::Graph<double>(no_v+1+destinations.size());
+        auto present = indexes();
+        // remove the off-limits positions (if there are any)
+        if (off_limits_.has_value() && off_limits_.value().size()) {
+          const auto & ol{off_limits_.value()};
+          present.erase(std::remove_if(present.begin(), present.end(), [&](const auto &i) {
+            return std::find(ol.begin(), ol.end(), i) != ol.end();}), present.end());
+        }
+        for (const auto & i: present) {
+            for (const auto & j: present) {
+                if (i != j && connected(i, j)) {
+                    graph.add_bidirectional(i, j, distance(i, j));
+                }
+            }
+        }
+        // add the from and to connections
+        std::vector<size_t> extra_indexes(1+destinations.size(), no_v);
+        const auto & fv{first.value()};
+        for (const auto & i: present) {
+            if (std::find(fv->begin(), fv->end(), i) != fv->end()) {
+                // we can only come *from* the source
+                graph.add_directional(no_v, i, norm(from - vertices_.view(i)).sum());
+            }
+        }
+        size_t destination_count{0};
+        for (const auto & last: destinations) {
+          extra_indexes[1+destination_count] = no_v + 1 + destination_count;
+          if (last.has_value()) {
+            const auto &lv{last.value()};
+            for (const auto &i: present) {
+              if (std::find(lv->begin(), lv->end(), i) != lv->end()) {
+                // we only go *towards* the sink(s)
+                graph.add_directional(i, extra_indexes[1+destination_count],
+                                      norm(to.view(destination_count) - vertices_.view(i)).sum());
+              }
+            }
+          }
+          ++destination_count;
+        }
+        auto max_distance = 100* norm(vertices_.min(0) - vertices_.max(0)).sum();
+        // find *all* paths from the source -- the value from each sink can be followed-backward to the source.
+        auto [costs, prev] = graph.find_paths(no_v, max_distance);
+
+        std::vector<std::pair<double, vertex_t>> costs_paths;
+        costs_paths.reserve(destinations.size());
+        destination_count = 0;
+        for (const auto & last: destinations){
+          if (last.has_value()) {
+            costs_paths.push_back(filter_back_pointer_path(prev, from, to.view(destination_count), extra_indexes[0], extra_indexes[1+destination_count]));
+          } else {
+            costs_paths.emplace_back((std::numeric_limits<double>::max)(), vertex_t());
+          }
+          ++destination_count;
+        }
+        return costs_paths;
+      }
+
   private:
+    template<class I> std::pair<double, vertex_t> filter_back_pointer_path(const std::vector<I> & back_pointers, const vertex_t & first, const vertex_t & last, size_t from, size_t to) const {
+        size_t next{to};
+        auto reverse = last.decouple();
+        while (next != from){
+          // update next (which we know we can reach)
+          next = back_pointers[next];
+          // check if first is reachable from here
+          auto pts = cat(0, reverse.view(reverse.size(0)-1), first);
+          if (!contains(pts, {0,1})){
+            // we can't skip to the end -- so check how far we *can* skip
+            size_t beyond{back_pointers[next]};
+            while (beyond != from && can_skip_to(reverse, beyond)) {
+              next = beyond;
+              beyond = back_pointers[next];
+            }
+            // we *can* move to next
+            reverse = cat(0, reverse, vertices_.view(next));
+          }
+        }
+        // reverse now contains the reverse path from `to` to one before `from` -- flip it around and calculate the cost
+        auto forward = first.decouple();
+        double cost{0};
+        for (ind_t i=reverse.size(0); i-->0;){
+          cost += norm(reverse.view(i) - forward.view(forward.size(0)-1)).sum();
+          forward = cat(0, forward, reverse.view(i));
+        }
+        return std::make_pair(cost, forward);
+    }
+    bool can_skip_to(const A<T>& far, const size_t to) const {
+      auto pts = cat(0, far.view(far.size(0)-1), vertices_.view(to));
+      return contains(pts, {0, 1});
+    }
     template<class I>
     size_t skip_ahead_to(A<T>& far, const size_t i, const std::vector<I>& path) const {
       if (i==path.size()-1) return i;
