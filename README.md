@@ -7,17 +7,21 @@ Wrapped for use in python using [pybind11](https://github.com/pybind/pybind11).
 # Dependencies
 ## TetGen
 A modified version of [TetGen](http://tetgen.org) is used to create
-refined tetrahedral meshes in the irreducible portion of the first Brillouin
-zone.
+refined tetrahedral meshes in bounding polyhedra.
 
 The modified version is included as part of this repository.
 
 # Installation
-From the root folder of this repository use Python 3 to build and install this library.
+Install via `pip`, e.g.,
+```cmd
+python -m pip install polystar
+```
 
-.. ::cmd
-  python -m pip install .
-  # or 
-  python setup.py install
+This repository can be installed locally via
+```cmd
+python -m pip install .
+# or 
+python setup.py install
+```
 
 Alternatively, the python module, C++ library, and [catch2](https://github.com/catchorg/Catch2) based tests can be built directly using `cmake`.
