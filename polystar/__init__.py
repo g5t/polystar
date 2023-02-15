@@ -1,4 +1,4 @@
-# Copyright © 2020 Greg Tucker <greg.tucker@stfc.ac.uk>
+# Copyright © 2023 Greg Tucker <greggory.tucker@gmail.com>
 #
 # This file is part of polystar.
 #
@@ -19,13 +19,7 @@
 =================================
 
 This module provides access to the C++ polystar library which can be used to
-interact with spacegroup and pointgroup symmetry operations, to determine the
-first Brillouin zone for a given real space crystallographic lattice, to
-find *an* irreducible polyhedron from the first Brillouin zone and the
-pointgroup operations of a spacegroup, to construct polyhedron-filling connected
-point networks, and to perform linear-interpolation of user-provided data for
-any reciprocal space point at a symmetry-equivalent position within the
-connected point network.
+interact with polyhedron and polygon routines.
 
 .. currentmodule:: polystar
 
@@ -33,11 +27,9 @@ connected point network.
     :toctree: _generate
 """
 from .bound import *
-from .lattice import Lattice
-from . import utils
 
 try:
-    from . import plotting
+    from . import vis
 except ModuleNotFoundError:
-    # Build servers don't have Matplotlib installed; plotting not tested
+    # Missing VisPy does not preclude use of module 
     pass
