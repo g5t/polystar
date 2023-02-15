@@ -164,11 +164,11 @@ namespace polystar::polygon{
       std::cout << "Returned polygon is wrong.\n";
       return *this;
     }
-    template<class R, template<class> class B>
-    [[nodiscard]] std::enable_if_t<isArray<R,B>, Poly<T,A>> cut(const B<R>& a, const B<R>& b, const R tol=R(0), const int dig=1) const {
-      auto [v, w] = wires_.cut(vertices_, a, b, tol, dig);
-      return {v, w};
-    }
+//    template<class R, template<class> class B>
+//    [[nodiscard]] std::enable_if_t<isArray<R,B>, Poly<T,A>> cut(const B<R>& a, const B<R>& b, const R tol=R(0), const int dig=1) const {
+//      auto [v, w] = wires_.cut(vertices_, a, b, tol, dig);
+//      return {v, w};
+//    }
 //    template<class R, template<class> class B>
 //    [[nodiscard]] std::enable_if_t<isArray<R,B>, size_t> edge_index(const B<R>& a, const B<R>& b) const {
 //      return wires_.edge_index(vertices_, a, b);

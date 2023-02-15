@@ -126,8 +126,12 @@ namespace polystar::bitmap {
   template<class T> using filter_queue_t = std::deque<std::pair<T, ind_t>>;
   /* filters from https://hal.science/hal-00692897/document
  * */
-  template<class T>
-  std::optional<T> filter1d(std::function<bool(T,T)> comparer,
+//  template<class T>
+//  std::optional<T> filter1d(std::function<bool(T,T)> comparer,
+//                            ind_t read, ind_t write, T value, ind_t left, ind_t right, ind_t N,
+//                            filter_queue_t<T> & fifo){
+  template<class T, class Comparer>
+  std::optional<T> filter1d(Comparer comparer,
                             ind_t read, ind_t write, T value, ind_t left, ind_t right, ind_t N,
                             filter_queue_t<T> & fifo){
     // remove un-needed values (comparer is <= for dilation; >= for erosion)
@@ -144,8 +148,11 @@ namespace polystar::bitmap {
    * For dilation    <=     numeric_limits<T>::min
    *     erosion     >=     numeric_limits<T>::max
    * */
-  template<class T>
-  Bitmap<T> filter2d(std::function<bool(T,T)> comparer, T pad, const Bitmap<T>& image,
+//  template<class T>
+//  Bitmap<T> filter2d(std::function<bool(T,T)> comparer, T pad, const Bitmap<T>& image,
+//                     ind_t left, ind_t right, ind_t top, ind_t bottom){
+  template<class T, class Comparer>
+  Bitmap<T> filter2d(Comparer comparer, T pad, const Bitmap<T>& image,
                      ind_t left, ind_t right, ind_t top, ind_t bottom){
     const auto M{image.rows()};
     const auto N{image.cols()};

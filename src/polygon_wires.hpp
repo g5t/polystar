@@ -294,32 +294,32 @@ namespace polystar::polygon {
       return Wires(border_, ws);
     }
 
-    template<class T, class R, template<class> class A,
-      template<class> class B>
-    std::tuple <A<T>, Wires>
-    cut(const A<T> &x, const B<R> &a, const B<R> &b, const R tol = R(0), const int dig = 1) const {
-      assert(a.ndim() == 2 && b.ndim() == 2);
-      assert(a.size(1) == 2 && b.size(1) == 2);
-      assert(a.size(0) == b.size(0));
-      auto ov = (T(1) * x).decouple();
-      Wires ow(*this);
-      for (ind_t i = 0; i < a.size(0); ++i) std::tie(ov, ow) = ow.one_cut(ov, a.view(i), b.view(i), tol, dig);
-      return std::make_tuple(ov, ow);
-    }
-
-    template<class T, class R, template<class> class A,
-      template<class> class B>
-    std::tuple <A<T>, Wires>
-    one_cut(const A<T> &x, const B<R> &a, const B<R> &b, const R tol = R(0), const int dig = 1) const {
-      assert(a.ndim() == 2 && b.ndim() == 2);
-      assert(a.size(1) == 2 && b.size(1) == 2);
-      assert(a.size(0) == b.size(0) && a.size(0) == 1);
-      auto ov = (T(1) * x).decouple();
-      if (none_beyond(x, a, b)) return std::make_tuple(x, Wires());
-      // otherwise find the vertices beyond a->b and remove them
-
-      return std::make_tuple(x, Wires(*this));
-    }
+//    template<class T, class R, template<class> class A,
+//      template<class> class B>
+//    std::tuple <A<T>, Wires>
+//    cut(const A<T> &x, const B<R> &a, const B<R> &b, const R tol = R(0), const int dig = 1) const {
+//      assert(a.ndim() == 2 && b.ndim() == 2);
+//      assert(a.size(1) == 2 && b.size(1) == 2);
+//      assert(a.size(0) == b.size(0));
+//      auto ov = (T(1) * x).decouple();
+//      Wires ow(*this);
+//      for (ind_t i = 0; i < a.size(0); ++i) std::tie(ov, ow) = ow.one_cut(ov, a.view(i), b.view(i), tol, dig);
+//      return std::make_tuple(ov, ow);
+//    }
+//
+//    template<class T, class R, template<class> class A,
+//      template<class> class B>
+//    std::tuple <A<T>, Wires>
+//    one_cut(const A<T> &x, const B<R> &a, const B<R> &b, const R tol = R(0), const int dig = 1) const {
+//      assert(a.ndim() == 2 && b.ndim() == 2);
+//      assert(a.size(1) == 2 && b.size(1) == 2);
+//      assert(a.size(0) == b.size(0) && a.size(0) == 1);
+//      auto ov = (T(1) * x).decouple();
+//      if (none_beyond(x, a, b)) return std::make_tuple(x, Wires());
+//      // otherwise find the vertices beyond a->b and remove them
+//
+//      return std::make_tuple(x, Wires(*this));
+//    }
 
     template<class T, class R, template<class> class A,
       template<class> class B>
@@ -387,7 +387,7 @@ namespace polystar::polygon {
       const auto p0{other.view(edge.first)};
       const auto p1{other.view(edge.second)};
       if (!border_.contains(p0, ours, inclusive) && !border_.contains(p1, ours, inclusive)) return false;
-      if (wires_.has_value()) for (const auto w: wires_.value())
+      if (wires_.has_value()) for (const auto & w: wires_.value())
         if (w.contains(p0, ours, inclusive) && w.contains(p1, ours, inclusive)) return false;
       return true;
     }

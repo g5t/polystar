@@ -46,12 +46,12 @@ void define_polygon_network(py::class_<A> & cls){
     auto to = py2a2(pyto);
     auto costs_paths = net.path_to_each(from, to);
     std::vector<double> costs;
-    std::vector<Array2<T>> paths;
+    std::vector<py::array_t<T>> paths;
     costs.reserve(costs_paths.size());
     paths.reserve(costs_paths.size());
     for (const auto & [cost, path]: costs_paths){
       costs.push_back(cost);
-      paths.push_back(path);
+      paths.push_back(a2py(path));
     }
     return std::make_tuple(costs, paths);
   }, "from"_a, "to"_a);

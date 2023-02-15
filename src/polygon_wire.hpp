@@ -395,24 +395,24 @@ namespace polystar::polygon {
       return o;
     }
 
-    template<class T, class R, template<class> class A,
-      template<class> class B>
-    std::tuple <A<T>, Wire> cut(const A<T> &x, const B<R> &a, const B<R> &b) const {
-//      auto is_b = is_beyond(x, a, b);
-//      A<T> xo(0u, 2u);
-//      if (!std::any_of(is_b.begin(), is_b.end(), true)) return std::make_tuple(x, Wire(*this));
-//      if (!std::all_of(is_b.begin(), is_b.end(), true)) return std::make_tuple(A<T>(), Wire());
-//      // otherwise, go-around the edges and find intersections
-//      auto ov = cat(0, a, b);
-//      edge_t oe{0,1};
-//      for (size_t i=0; i<size(); ++i){
-//        auto [n, p] = intersection2d(ov, oe, x, edge(i));
-//        if (n == 1) {
-//
-//        }
-//      }
-      return std::make_tuple(x, Wire(*this));
-    }
+//    template<class T, class R, template<class> class A,
+//      template<class> class B>
+//    std::tuple <A<T>, Wire> cut(const A<T> &x, const B<R> &a, const B<R> &b) const {
+////      auto is_b = is_beyond(x, a, b);
+////      A<T> xo(0u, 2u);
+////      if (!std::any_of(is_b.begin(), is_b.end(), true)) return std::make_tuple(x, Wire(*this));
+////      if (!std::all_of(is_b.begin(), is_b.end(), true)) return std::make_tuple(A<T>(), Wire());
+////      // otherwise, go-around the edges and find intersections
+////      auto ov = cat(0, a, b);
+////      edge_t oe{0,1};
+////      for (size_t i=0; i<size(); ++i){
+////        auto [n, p] = intersection2d(ov, oe, x, edge(i));
+////        if (n == 1) {
+////
+////        }
+////      }
+//      return std::make_tuple(x, Wire(*this));
+//    }
 
     template<class T, class R, template<class> class A,
       template<class> class B>

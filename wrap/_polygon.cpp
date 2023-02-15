@@ -21,11 +21,11 @@ void wrap_polygon(pybind11::module &m){
   using namespace polystar::polygon;
   namespace py = pybind11;
 
-  py::class_<Poly<double,bArray>> bare(m, "Polygon");
+  py::class_<Poly<double,Array2>> bare(m, "Polygon");
   define_polygon_inits<double>(bare);
   define_polygon<double>(bare);
 
-  py::class_<Poly<int,bArray>> coord(m, "CoordinatePolygon");
+  py::class_<Poly<int,Array2>> coord(m, "CoordinatePolygon");
   define_polygon_inits<int>(coord);
   define_polygon<int>(coord);
 
