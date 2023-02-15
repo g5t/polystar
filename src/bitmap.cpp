@@ -62,7 +62,6 @@ void write_info_header(std::ofstream & of, size_t height, size_t width){
 void polystar::bitmap::write(const std::vector<std::vector<Color>> & image, const std::string & filename){
   auto height = image.size();
   auto width = image[0].size();
-  for (auto & row : image) assert(row.size() == width);
 
   auto width_bytes = width * BYTES_PER_PIXEL;
   unsigned char padding[3] = {0, 0, 0};

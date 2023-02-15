@@ -109,7 +109,7 @@ namespace polystar::polygon {
     }
 
     template<class T, template<class> class A>
-    Network<T,A> triangulate(const A<T>& x) const {
+    Network<Wire,T,A> triangulate(const A<T>& x) const {
       using group_t = std::array<ind_t,3>;
       std::vector<group_t> groups;
       groups.reserve(size());
@@ -253,51 +253,8 @@ namespace polystar::polygon {
         groups.erase(ptr);
 
       }
-      return Network<T,A>(triangles, x);
+      return Network<Wire,T,A>(triangles, x);
     }
-
-//
-//      // Use the ear-clipping method to triangulate this possibly-convex polygon
-//      Wire remnants{*this};
-//
-//      std::vector<Wire> triangles;
-//      std::vector<bool> unused(size(), true);
-//      size_t i{0};
-//      size_t failures{0};
-//      while (remnants.size() > 3 && failures < 10 * remnants.size()) {
-//        // we want i-1 and i+1 but need to add size() *first* in the first case to avoid underflow at 0
-//        edge_t e{remnants[(i+remnants.size()-1)%remnants.size()], remnants[(i+1)%remnants.size()]};
-//        std::cout << "wire: ";
-//        for (const auto & r: remnants) std::cout << r << " ";
-//        std::cout << "\n try edge (" << e.first << "-" << e.second << ")\n";
-//        // If the new edge does not hit any edge in the remnants, and is inside of it
-//        const auto & ti{x.view(remnants[i])};
-//        const auto & t0{x.view(e.first)};
-//        const auto & t1{x.view(e.second)};
-//        if (!remnants.intersects(x, e, x, false) && cross2d(ti-t0, t1-ti).val(0,0) > 0) {
-//          std::cout << "Successful edge from " << t0.to_string(0) << " to " << t1.to_string(0);
-//          // (i, i+1, i-1) is a triangle in the triangulation
-//          base_t tri{remnants.vi(i), e.second, e.first};
-//          std::cout << " gives triangle " << remnants.vi(i) << ", " << e.second << ", " << e.first << "\n";
-//          triangles.emplace_back(tri);
-//          // the current point must be removed from the remnants -- and `i` now is the *next* triangle point to consider
-//          remnants.erase(remnants.begin()+i);
-//          failures = 0;
-//        } else {
-//          // (i, i+1, i-1) not a triangle -- so move on
-//          i++;
-//          failures++;
-//        }
-//        // and ensure we only consider in-bounds point indexes
-//        i %= remnants.size();
-//      }
-//      if (remnants.size() == 3){
-//        triangles.push_back(remnants);
-////      } else {
-////        throw std::runtime_error("Fewer than three points can not be triangulated");
-//      }
-//      return Network<T,A>(triangles, x);
-//    }
 
     template<class T, template<class> class A>
     T area(const A<T> &x) const {

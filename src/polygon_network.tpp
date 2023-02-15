@@ -105,8 +105,8 @@ bool would_be_convex(const W & a, const std::shared_ptr<W> b, const A<T>& x){
   return is_convex(va) && is_convex(vb);
 }
 
-template<class T, template<class> class A>
-polystar::polygon::Network<T,A> polystar::polygon::Network<T,A>::simplify() {
+template<class W, class T, template<class> class A>
+polystar::polygon::Network<W,T,A> polystar::polygon::Network<W,T,A>::simplify() {
   std::vector<wire_t> merged_away;
   auto is_in = [](const auto & v, const auto & x){
     return std::find(v.begin(), v.end(), x) != v.end();
@@ -128,12 +128,12 @@ polystar::polygon::Network<T,A> polystar::polygon::Network<T,A>::simplify() {
     simple_wires.push_back(simple_wire);
   }
   // use the constructor to sort-out connectivity information
-  return polystar::polygon::Network<T,A>(simple_wires, vertices_);
+  return polystar::polygon::Network<W,T,A>(simple_wires, vertices_);
 }
 
-template<class T, template<class> class A>
-std::optional<typename polystar::polygon::Network<T,A>::wire_t>
-  polystar::polygon::Network<T,A>::containing_wire(const typename polystar::polygon::Network<T,A>::vertex_t & x) const {
+template<class W, class T, template<class> class A>
+std::optional<typename polystar::polygon::Network<W,T,A>::wire_t>
+  polystar::polygon::Network<W,T,A>::containing_wire(const typename polystar::polygon::Network<W,T,A>::vertex_t & x) const {
     for (const auto & [w, l]: map_) {
       auto x_in = w->contains(x, vertices_);
       if (std::find(x_in.begin(), x_in.end(), false) == x_in.end()) return std::make_optional(w);
@@ -141,9 +141,9 @@ std::optional<typename polystar::polygon::Network<T,A>::wire_t>
     return std::nullopt;
 }
 
-template<class T, template<class> class A>
-  typename polystar::polygon::Network<T,A>::edge_t
-  polystar::polygon::Network<T,A>::common_edge(const wire_t & asp, const wire_t & bsp) const {
+template<class W, class T, template<class> class A>
+  typename polystar::polygon::Network<W,T,A>::edge_t
+  polystar::polygon::Network<W,T,A>::common_edge(const wire_t & asp, const wire_t & bsp) const {
   // error checking to ensure that they're in each other's connected lists? No, since this is private
   auto a = asp.get();
   auto b = bsp.get();

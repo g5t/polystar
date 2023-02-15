@@ -15,7 +15,8 @@ namespace polystar::graph {
     std::vector<std::list<next_t>> adj_;
   public:
     Graph(size_t no);
-    void addEdge(size_t u, size_t v, cost_t weight);
+    void add_bidirectional(size_t u, size_t v, cost_t weight);
+    void add_directional(size_t u, size_t v, cost_t weight);
     std::vector<size_t> shortestPath(size_t s, size_t f, cost_t m);
   };
 
@@ -25,9 +26,13 @@ namespace polystar::graph {
     adj_.resize(no_);
   }
   template<class cost_t>
-  void Graph<cost_t>::addEdge(size_t u, size_t v, cost_t w) {
+  void Graph<cost_t>::add_bidirectional(size_t u, size_t v, cost_t w) {
     adj_[u].emplace_back(w, v);
     adj_[v].emplace_back(w, u);
+  }
+  template<class cost_t>
+  void Graph<cost_t>::add_directional(size_t u, size_t v, cost_t w) {
+    adj_[u].emplace_back(w, v);
   }
   template<class cost_t>
   std::vector<size_t> Graph<cost_t>::shortestPath(size_t src, size_t snk, cost_t max_cost) {

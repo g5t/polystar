@@ -28,7 +28,14 @@ void define_polygon_network(py::class_<A> & cls){
 
   cls.def("simplify",&A::simplify);
   cls.def("wires",&A::wires);
-  cls.def("polygons",&A::polygons);
+  cls.def("polygons",[](const A& net){
+    std::vector<Poly<T,Array2>> p;
+    p.reserve(net.size());
+    for (const auto & w: net.wires()) {
+      p.emplace_back(net.vertices(), Wires(w));
+    }
+    return p;
+  });
   cls.def("path",[](const A& net, const py::array_t<T>& pyfrom, const py::array_t<T>& pyto){
     auto from = py2a2(pyfrom);
     auto to = py2a2(pyto);

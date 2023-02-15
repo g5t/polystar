@@ -4,63 +4,61 @@
 #include <map>
 #include <vector>
 #include <algorithm>
+#include <optional>
 #include "graph.hpp"
 
 namespace polystar::polygon {
-  // pre-declare interdependent classes
-  class Wire;
-  class Wires;
-  template<class T, template<class> class A> class Poly;
-  Wire wire_merge(const Wire &, const Wire &);
 
-    template<class wire_t>
-  class NetworkCost {
-  public:
-      using cost_t = double;
-      using path_t = std::vector<ind_t>;
-      using elem_t = std::pair<cost_t, path_t>;
-      using map_t = std::map<wire_t, elem_t>;
-  private:
-      map_t map_;
-  public:
-      bool known(wire_t p) const {
-          return std::find_if(map_.begin(), map_.end(), [p](const auto & x){
-              const auto & [w, z] = x;
-              return p == w;
-          }) != map_.end();
-      }
-      elem_t cost(wire_t p) const {
-          auto ptr = std::find_if(map_.begin(), map_.end(), [p](const auto & x){
-              const auto & [w, z] = x;
-              return p == w;
-          });
-          if (ptr != map_.end()) {
-              const auto & [w, z] = *ptr;
-              return z;
-          }
-          return std::make_pair<cost_t, path_t>(-1, path_t());
-      }
-      const elem_t & operator[](const wire_t & w) const {return map_[w];}
-      elem_t & operator[](const wire_t & w) {return map_[w];}
-  };
+//  template<class wire_t>
+//  class NetworkCost {
+//  public:
+//      using cost_t = double;
+//      using path_t = std::vector<ind_t>;
+//      using elem_t = std::pair<cost_t, path_t>;
+//      using map_t = std::map<wire_t, elem_t>;
+//  private:
+//      map_t map_;
+//  public:
+//      bool known(wire_t p) const {
+//          return std::find_if(map_.begin(), map_.end(), [p](const auto & x){
+//              const auto & [w, z] = x;
+//              return p == w;
+//          }) != map_.end();
+//      }
+//      elem_t cost(wire_t p) const {
+//          auto ptr = std::find_if(map_.begin(), map_.end(), [p](const auto & x){
+//              const auto & [w, z] = x;
+//              return p == w;
+//          });
+//          if (ptr != map_.end()) {
+//              const auto & [w, z] = *ptr;
+//              return z;
+//          }
+//          return std::make_pair<cost_t, path_t>(-1, path_t());
+//      }
+//      const elem_t & operator[](const wire_t & w) const {return map_[w];}
+//      elem_t & operator[](const wire_t & w) {return map_[w];}
+//  };
 
-  template<class T, template<class> class A>
+  template<class W, class T, template<class> class A>
   class Network {
   public:
-    using wire_t = std::shared_ptr<Wire>;
-    using ref_t = std::weak_ptr<Wire>;
+    using wire_t = std::shared_ptr<W>;
+    using ref_t = std::weak_ptr<W>;
     using list_t = std::vector<ref_t>;
     using map_t = std::map<wire_t, list_t>;
     using vertex_t = A<T>;
     using edge_t = std::pair<ind_t, ind_t>;
+    using off_t = std::optional<W>;
   private:
     map_t map_;
     vertex_t vertices_;
     std::vector<edge_t> external_;
+    off_t off_limits_=std::nullopt;
   public:
-    Network(const std::vector<Wire> & wires, const Array2<T> & v): vertices_(v) {
+    Network(const std::vector<W> & wires, const Array2<T> & v): vertices_(v) {
       for (const auto & w: wires){
-        auto sw = std::make_shared<Wire>(w);
+        auto sw = std::make_shared<W>(w);
         list_t wl;
         wl.reserve(wires.size()-1);
         for (auto & [ow, ol]: map_){
@@ -73,26 +71,34 @@ namespace polystar::polygon {
       }
       find_external_edges();
     }
+    void off_limits(const W & of) {
+      // only accept setting the off limits positions if it does not remove all known positions
+      for (const auto & i: indexes()) if (std::find(of.begin(), of.end(), i) == of.end()) {
+        off_limits_=of;
+        break;
+      }
+    }
 
     [[nodiscard]] size_t size() const { return map_.size(); }
 
 
-    [[nodiscard]] std::vector<Wire> wires() const {
-      std::vector<Wire> w;
+    [[nodiscard]] std::vector<W> wires() const {
+      std::vector<W> w;
       w.reserve(size());
       for (const auto & [x, l]: map_) w.emplace_back(*(x.get()));
       return w;
     }
+    vertex_t vertices() const {return vertices_;}
 
-    std::vector<Poly<T,A>> polygons() const {
-      std::vector<Poly<T,A>> p;
-      p.reserve(size());
-      for (const auto & w: wires()) {
-        auto ws = Wires(w);
-        p.emplace_back(vertices_, ws);
-      }
-      return p;
-    }
+//    std::vector<Poly<T,A>> polygons() const {
+//      std::vector<Poly<T,A>> p;
+//      p.reserve(size());
+//      for (const auto & w: wires()) {
+//        auto ws = Wires(w);
+//        p.emplace_back(vertices_, ws);
+//      }
+//      return p;
+//    }
 
     size_t erase_wire(wire_t w){
       auto old_size = map_.size();
@@ -114,7 +120,7 @@ namespace polystar::polygon {
 
     std::optional<wire_t> containing_wire(const vertex_t & x) const;
 
-    Network<T,A> simplify();
+    Network<W,T,A> simplify();
 
     vertex_t path(const vertex_t & from, const vertex_t & to) const {
       auto last = containing_wire(to);
@@ -126,11 +132,17 @@ namespace polystar::polygon {
       auto no_v = vertices_.size(0);
       auto graph = graph::Graph<double>(no_v+2); // no more than 2 + len(vertices_) nodes (probably exactly this)
       auto present = indexes();
+      // remove the off-limits positions (if there are any)
+      if (off_limits_.has_value() && off_limits_.value().size()) {
+        const auto & ol{off_limits_.value()};
+        present.erase(std::remove_if(present.begin(), present.end(), [&](const auto &i) {
+          return std::find(ol.begin(), ol.end(), i) != ol.end();}), present.end());
+      }
       for (const auto & i: present) {
         for (const auto & j: present) {
           if (i != j && connected(i, j)) {
 //            std::cout << i << "--" << j << ": " << distance(i, j) << "\n";
-            graph.addEdge(i, j, distance(i, j));
+            graph.add_bidirectional(i, j, distance(i, j));
           }
         }
       }
@@ -139,10 +151,12 @@ namespace polystar::polygon {
       const auto & lv{last.value()};
       for (const auto & i: present) {
         if (std::find(fv->begin(), fv->end(), i) != fv->end()) {
-          graph.addEdge(no_v, i, norm(from - vertices_.view(i)).sum());
+          // we can only come *from* the source
+          graph.add_directional(no_v, i, norm(from - vertices_.view(i)).sum());
         }
         if (std::find(lv->begin(), lv->end(), i) != lv->end()) {
-          graph.addEdge(no_v+1, i, norm(to - vertices_.view(i)).sum());
+          // we only go *towards* the sink
+          graph.add_directional(i, no_v+1, norm(to - vertices_.view(i)).sum());
         }
       }
       auto max_distance = 100* norm(vertices_.min(0) - vertices_.max(0)).sum();

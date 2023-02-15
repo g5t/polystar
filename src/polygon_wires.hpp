@@ -176,9 +176,11 @@ namespace polystar::polygon {
     }
 
     template<class T, template<class> class A>
-      Network<T,A> triangulate(const A<T>& v) const {
+      Network<Wire,T,A> triangulate(const A<T>& v) const {
       auto s = simplify(v);
-      return s.border().triangulate(v);
+      auto tri = s.border().triangulate(v);
+      tri.off_limits(border_);
+      return tri;
     }
 
 
@@ -390,10 +392,10 @@ namespace polystar::polygon {
       return true;
     }
 
-    template<class R, class T, template<class> class B, template<class> class A>
-      Poly<T,A> intersection(const Poly<R,B> that, const A<T> & ours, const R tol=R(0), const int dig=1) const {
-
-    }
+//    template<class P, class T, template<class> class A>
+//    P intersection(const P& that, const A<T> & ours, const R tol=R(0), const int dig=1) const {
+//
+//    }
 
 
 #ifdef USE_HIGHFIVE
