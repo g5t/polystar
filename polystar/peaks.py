@@ -63,6 +63,14 @@ def board():
     board = CoordinatePolygon(np.array([[0, 0], [0,300], [300, 300], [300, 0]], dtype='int'))
     return board + holes
 
+def array():
+    from _polystar import BitmapI, CoordinatePolygon
+    bm = BitmapI(multi(300, 300, 'int'))
+    polygons = bm.extract_array_polygons(1)
+    holes = [p.inverse for p in polygons]
+    board = CoordinatePolygon(np.array([[0, 0], [0,300], [300, 300], [300, 0]], dtype='int'))
+    return board + holes
+
 def polylineplot(pl, *args, **kwargs):
     import matplotlib.pyplot as pp
     pp.plot(pl[:,0], pl[:,1], *args, **kwargs)

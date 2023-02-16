@@ -17,16 +17,24 @@ std::array<std::pair<Point<int>,Point<int>>, 4> cs_neighbours(const coordinates:
   }
 }
 std::array<std::array<Point<int>, 4>, 4> cs_corners(const coordinates::system cs){
+  /* For the corner of a pixel (top left in y_down_x_right)
+   * Return the movement required to reach the pixel data
+   *    {behind and to the left, behind and to the right, ahead and to the left, ahead and to the right}
+   * for each facing direction
+   *    {positive y, negative x, negative y, positive x}
+   *
+   * Note, the coordinates are all (y, x) :/
+   * */
   switch (cs){
     case coordinates::system::y_up_x_right:
       return {{
-                {{{0, -1}, {0,  0}, {1, -1}, {1,  0}}},
-                {{{0,  0}, {1,  0}, {0, -1}, {1, -1}}},
-                {{{1,  0}, {1, -1}, {0,  0}, {0, -1}}},
-                {{{1, -1}, {0, -1}, {1,  0}, {0,  0}}}
-      }};
+                {{{-1, -1}, {-1,  0}, { 0, -1}, { 0,  0}}},
+                {{{-1,  0}, { 0,  0}, {-1, -1}, { 0, -1}}},
+                {{{ 0,  0}, { 0, -1}, {-1,  0}, {-1, -1}}},
+                {{{ 0, -1}, {-1, -1}, { 0,  0}, {-1,  0}}}
+              }};
     case coordinates::system::y_down_x_right:
-      return {{
+      return {{// back left, back right, ahead left, ahead right
                 {{{-1,  0}, {-1, -1}, { 0,  0}, { 0, -1}}},
                 {{{ 0,  0}, {-1,  0}, { 0, -1}, {-1, -1}}},
                 {{{ 0, -1}, { 0,  0}, {-1, -1}, {-1, 0}}},
@@ -64,6 +72,8 @@ Array2<T> flip_range(Array2<T> image, int x0, int y0, int xz){
   return image;
 }
 
+// Along with the definitions of the coordinate systems below, this is (surprisingly) independent
+// of *which* way positive y faces
 template<class T, class Ptr>
 Array2<T> flip_inside(Array2<T> image, Ptr first, Ptr last){
   auto yz = (last - 1)->coord()[0];
@@ -106,12 +116,15 @@ if (!dir.has_value()) throw std::runtime_error("Unsupported starting edge detect
 std::vector<Point<int>> vertices;
 vertices.push_back(start);
 
+// The next direction chosen depends on whether the coordinate system is right- or left-handed
+// These rules appear to only work for left-handed coordinate systems, strangely.
+// A (temporary?) fix for right-handed coordinate systems is to flip the left and right indexing used below
 auto next_direction = [&](const auto & p, const size_t direction){
   auto abcd = abcd_direction[direction];
-  auto a = is_white(p + abcd[0]);
-  auto b = is_white(p + abcd[1]);
-  auto c = is_white(p + abcd[2]);
-  auto d = is_white(p + abcd[3]);
+  auto a = is_white(p + abcd[0]); // back and to the left
+  auto b = is_white(p + abcd[1]); // back and to the right
+  auto c = is_white(p + abcd[2]); // forward and to the left
+  auto d = is_white(p + abcd[3]); // forward and to the right
   if (a && b && c && d){
     return std::optional<size_t>(std::nullopt);
   }
@@ -141,7 +154,7 @@ do {
   if (vertices.size() > 4) { // we need 5 vertices to enclose *1* pixel
   auto ptr = std::find(vertices.begin(), vertices.end() - 1, vertices.back());
   if (std::distance(ptr, vertices.end()) > 4) {
-      input = flip_inside(input, ptr, vertices.end());
+    input = flip_inside(input, ptr, vertices.end());
     }
   }
   dir = next_direction(vertices.back(), dir.value());
@@ -150,106 +163,6 @@ do {
 return std::make_tuple(area, vertices);
 }
 
-//
-//bool is_cyclic(int a, int b, int c){
-//  return a <= c ? (a <= b && b < c) : (a <= b || b<c);
-//}
-//
-//int local_mod(int a, int n){
-//  return a >= n ? a % n : a >= 0 ? a : n - 1 - (-1 - a) % n;
-//}
-//
-//int floor_division(int a, int n){
-//  return a >= 0 ? a / n : -1 - (-1 - a) / n;
-//}
-//
-//std::vector<int> path_point_longest(const std::vector<Point<int>> & inp){
-//  std::vector<int> nc;
-//  nc.reserve(inp.size());
-//  auto cj = inp.front().coord();
-//  size_t j{0};
-//  for (size_t i=inp.size(); i-->0; ){
-//    auto ci = inp[i].coord();
-//    if (ci[0] != cj[0] && ci[1] != cj[1]) {
-//      j = i + 1; // i+1 != N since inp[N-1] == inp[0]
-//      cj = inp[j].coord();
-//    }
-//    nc.push_back(j);
-//  }
-//  std::array<int,4> count{{0, 0, 0, 0}};
-//  std::vector<int> pivots;
-//  pivots.reserve(inp.size());
-//  coordinates::Point<int> encode{1,3}, cont[2]{{0, 0}, {0, 0}};
-//
-//  int no = static_cast<int>(inp.size());
-//
-//  for (size_t i=inp.size(); i-->0; ){
-//    count[0] = count[1] = count[2] = count[3] = 0;
-//
-//    count[static_cast<size_t>((3 + encode * (inp[static_cast<size_t>(local_mod(i+1, no))] - inp[i])) / 2)]++;
-//
-//    cont[0] = coordinates::Point<int>(0, 0);
-//    cont[1] = coordinates::Point<int>(0, 0);
-//
-//    auto j = nc[i];
-//    auto j1 = i;
-//    while (true) {
-//      count[static_cast<size_t>((3 + encode * (inp[j] - inp[j1]).clamp(-1, 1)) / 2)]++;
-//      if (count[0] && count[1] && count[2] && count[3]) {
-//        pivots.push_back(j1);
-//        break;
-//      }
-//      auto current = inp[j] - inp[i];
-//      if (cross(cont[0], current) < 0 || cross(cont[1], current) > 0) {
-//        auto deltaj = (inp[j] - inp[j1]).clamp(-1, 1);
-//        current = inp[j1] - inp[i];
-//        auto a = cross(cont[0], current);
-//        auto b = cross(cont[0], deltaj);
-//        auto c = cross(cont[1], current);
-//        auto d = cross(cont[1], deltaj);
-//        j = b < 0 ? floor_division(a, -b) : d > 0 ? floor_division(-c, d) : -100000000;
-//        pivots.push_back(local_mod(j1 + j, no));
-//        break;
-//      }
-//      auto ac = abs(current).coord();
-//      if (ac[0] > 1 || ac[1] > 1){
-//        auto cc = current.coord();
-//        auto oy = cc[0] + ((cc[1] <= 0 && (cc[1] < 0 || cc[0] < 0)) ? 1 : -1);
-//        auto ox = cc[1] + ((cc[0] >= 0 && (cc[0] > 0 || cc[1] < 0)) ? 1 : -1);
-//        Point<int> of0{oy, ox};
-//        if (cross(cont[0], of0) >= 0) {
-//          cont[0] = of0;
-//        }
-//        oy = cc[0] + ((cc[1] >= 0 && (cc[1] > 0 || cc[0] < 0)) ? 1 : -1);
-//        ox = cc[1] + ((cc[0] <= 0 && (cc[0] < 0 || cc[1] < 0)) ? 1 : -1);
-//        Point<int> of1{oy, ox};
-//        if (cross(cont[1], of1) <= 0) {
-//          cont[1] = of1;
-//        }
-//      }
-//      j1 = j;
-//      j = nc[j1];
-//      if (!is_cyclic(j, i, j1)) {
-//        pivots.push_back(no);
-//        break;
-//      }
-//    }
-//  }
-//
-//  j = pivots.back();
-//  std::vector<int> longest(inp.size(), 0);
-//  longest.back() = j;
-//  for (size_t i=inp.size()-1; i-->0; ){
-//    if (is_cyclic(static_cast<int>(i+1), pivots[i], j)) j = pivots[j];
-//    longest[i] = j;
-//  }
-//  for (size_t i=inp.size()-1; is_cyclic(local_mod(static_cast<int>(i+1), no), j, longest[i]); --i){
-//    longest[i] = j;
-//  }
-//
-//  return longest;
-//}
-
 std::vector<Point<int>> polystar::bitmap::fix_path(const std::vector<Point<int>> & p) {
   // This doesn't produce optimal edges in the potrace sense, but is probably sufficient for now:
   auto stop_segment = [](const auto & s){
@@ -257,6 +170,8 @@ std::vector<Point<int>> polystar::bitmap::fix_path(const std::vector<Point<int>>
     auto pc = as<double>(l).coord();
     auto perp = Point(pc[1], -pc[0]);
     auto pn = perp / std::sqrt(perp * perp);
+    // force horizontal or vertical lines once we exceed some length?
+    if (s.size() > 20) for (size_t i=19; i<s.size()-1; ++i) if (std::abs((s[i] - s[0]) * pn) > 0.5) return true;
     for (size_t i=1; i<s.size()-1; ++i){
       if (std::abs((s[i] - s[0]) * pn) >= 1) return true;
     }

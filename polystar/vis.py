@@ -37,7 +37,6 @@ class VisPolyhedron:
     opacity: float = 0.2
 
     def __post_init__(self):
-        from polystar import
         if isinstance(self.face_color, str):
             self.face_color = Color(self.face_color)
         if isinstance(self.edge_color, str):
