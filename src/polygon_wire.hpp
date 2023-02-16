@@ -12,6 +12,7 @@
 #include "geometry.hpp"
 #include "approx_float.hpp"
 #include "polygon_network.hpp"
+#include "svg.hpp"
 
 namespace polystar::polygon {
   using ind_t = polystar::ind_t;
@@ -447,6 +448,17 @@ namespace polystar::polygon {
     friend std::ostream &operator<<(std::ostream &os, Wire w) {
       os << w.python_string();
       return os;
+    }
+
+    template<class T, template<class> class A>
+    void add_to_svg(SVG::Path & path, const A<T>& x) const {
+      auto first_and_last = front();
+      path.move_to(x.val(first_and_last, 0), x.val(first_and_last, 1));
+      for (auto ptr=begin()+1; ptr!=end(); ++ptr){
+        path.line_to(x.val(*ptr, 0), x.val(*ptr, 1));
+      }
+      // close the wire
+      path.line_to(x.val(first_and_last, 0), x.val(first_and_last, 1));
     }
 
   };

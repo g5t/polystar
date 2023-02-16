@@ -55,6 +55,14 @@ void define_polygon_network(py::class_<A> & cls){
     }
     return std::make_tuple(costs, paths);
   }, "from"_a, "to"_a);
+
+  cls.def("write_svg", [](const A& p, const std::string filename, const std::string fill, const std::string stroke){
+    p.write_svg(filename, std::make_optional(fill), std::make_optional(stroke));
+  }, "filename"_a, py::kw_only(), "fill"_a="none", "stroke"_a="black");
+  cls.def("to_svg", [](const A& p, const std::string fill, const std::string stroke){
+    return p.to_svg(std::make_optional(fill), std::make_optional(stroke));
+  }, py::kw_only(), "fill"_a="none", "stroke"_a="black");
+
 }
 
 #endif

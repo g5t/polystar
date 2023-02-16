@@ -11,6 +11,7 @@
 #include "geometry.hpp"
 #include "approx_float.hpp"
 #include "polygon_wire.hpp"
+#include "svg.hpp"
 
 namespace polystar::polygon {
   using ind_t = polystar::ind_t;
@@ -396,6 +397,12 @@ namespace polystar::polygon {
 //    P intersection(const P& that, const A<T> & ours, const R tol=R(0), const int dig=1) const {
 //
 //    }
+
+    template<class T, template<class> class A>
+    void add_to_svg(SVG::Path & path, const A<T>& x) const {
+      border_.add_to_svg(path, x);
+      if (wires_.has_value()) for (const auto & w: wires_.value()) w.add_to_svg(path, x);
+    }
 
 
 #ifdef USE_HIGHFIVE

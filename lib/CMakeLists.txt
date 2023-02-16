@@ -3,3 +3,4 @@
 # endif()
 
 add_subdirectory(tetgen)
+add_subdirectory(svg)

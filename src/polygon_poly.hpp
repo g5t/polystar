@@ -13,6 +13,8 @@
 #include "polygon_wires.hpp"
 #include "polygon_network.hpp"
 
+#include "svg.hpp"
+
 namespace polystar::polygon{
   using ind_t = polystar::ind_t;
 
@@ -188,6 +190,34 @@ namespace polystar::polygon{
     friend std::ostream & operator<<(std::ostream & os, const Poly<T,A>& p){
       os << p.python_string();
       return os;
+    }
+
+    void add_to_svg(SVG::Path & path) const {
+      wires_.add_to_svg(path, vertices_);
+    }
+    SVG::SVG to_svg(const std::optional<std::string_view> fill, const std::optional<std::string_view> stroke) const {
+      SVG::SVG svg;
+      svg.style("path").set_attr("fill", std::string(fill.value_or("tan")));
+      svg.style("path").set_attr("stroke",std::string(stroke.value_or("black")));
+      auto path = svg.add_child<SVG::Path>();
+      add_to_svg(*path);
+      svg.autoscale();
+      return svg;
+    }
+    SVG::SVG to_svg(const std::string_view fill) const {
+      return to_svg(std::make_optional(fill), std::nullopt);
+    }
+//    SVG::SVG to_svg(const std::string_view fill, const std::string_view stroke) const {
+//      return to_svg(std::make_optional(fill), std::make_optional(stroke));
+//    }
+    SVG::SVG to_svg() const {
+      return to_svg(std::nullopt, std::nullopt);
+    }
+    template<class... Args>
+    void write_svg(const std::string & filename, Args... args) const {
+      auto svg = to_svg(args...);
+      auto of = std::ofstream(filename);
+      of << std::string(svg);
     }
 
 #ifdef USE_HIGHFIVE

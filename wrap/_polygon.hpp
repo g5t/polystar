@@ -61,6 +61,12 @@ void define_polygon(py::class_<A> & cls){
   cls.def("intersection",[](const A& p, const A& o){return p.intersection(o);});
   cls.def("simplify",&A::simplify);
   cls.def("triangulate",&A::triangulate);
+  cls.def("write_svg", [](const A& p, const std::string filename, const std::string fill, const std::string stroke){
+    p.write_svg(filename, std::make_optional(fill), std::make_optional(stroke));
+  }, "filename"_a, py::kw_only(), "fill"_a="none", "stroke"_a="black");
+  cls.def("to_svg", [](const A& p, const std::string fill, const std::string stroke){
+    return p.to_svg(std::make_optional(fill), std::make_optional(stroke));
+  }, py::kw_only(), "fill"_a="none", "stroke"_a="black");
 
 // overloaded operations:
   cls.def("__eq__", [](const A& p, const A& o){return p == o;});
@@ -69,5 +75,23 @@ void define_polygon(py::class_<A> & cls){
   cls.def("__add__", [](const A& p, const std::vector<A> & v){return p.combine_all(v);});
 
 }
+//
+//template<class T, class A>
+//void define_svg_animation(pybind11::module &m, py::class_<A> & cls){
+//  namespace py = pybind11;
+//  using namespace polystar;
+//  using namespace polystar::polygon;
+//  using namespace pybind11::literals;
+//
+//  m.def("animated_svg",[](const std::vector<A>& polygons,
+//      const std::string & fill, const std::string & stroke,
+//      const double fps){
+//    std::vector<SVG::SVG> svgs;
+//    svgs.reserve(polygons.size());
+//    for (const auto & polygon: polygons) svgs.push_back(polygon.to_svg(std::make_optional(fill), std::make_optional(stroke)));
+//    auto animated = SVG::frame_animate(svgs, fps);
+//    return animated;
+//  }, "polygons"_a, py::kw_only(), "fill"_a="none", "stroke"_a="black");
+//}
 
 #endif

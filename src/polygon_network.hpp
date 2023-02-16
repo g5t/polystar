@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <optional>
 #include "graph.hpp"
+#include "svg.hpp"
 
 namespace polystar::polygon {
   template<class W, class T, template<class> class A>
@@ -213,6 +214,33 @@ namespace polystar::polygon {
         }
         return costs_paths;
       }
+
+    void add_to_svg(SVG::SVG & svg) const {
+      for (const auto & [w, l]: map_){
+        auto path = svg.add_child<SVG::Path>();
+        w->add_to_svg(*path, vertices_);
+      }
+    }
+    SVG::SVG to_svg(const std::optional<std::string_view> fill, const std::optional<std::string_view> stroke) const {
+      SVG::SVG svg;
+      svg.style("path").set_attr("fill", std::string(fill.value_or("tan")));
+      svg.style("path").set_attr("stroke",std::string(stroke.value_or("black")));
+      add_to_svg(svg);
+      svg.autoscale();
+      return svg;
+    }
+    SVG::SVG to_svg(const std::string_view fill) const {
+      return to_svg(std::make_optional(fill), std::nullopt);
+    }
+    SVG::SVG to_svg() const {
+      return to_svg(std::nullopt, std::nullopt);
+    }
+    template<class... Args>
+    void write_svg(const std::string & filename, Args... args) const {
+      auto svg = to_svg(args...);
+      auto of = std::ofstream(filename);
+      of << std::string(svg);
+    }
 
   private:
     template<class I> std::pair<double, vertex_t> filter_back_pointer_path(const std::vector<I> & back_pointers, const vertex_t & first, const vertex_t & last, size_t from, size_t to) const {

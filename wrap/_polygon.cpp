@@ -16,6 +16,7 @@ You should have received a copy of the GNU Affero General Public License
 along with polystar. If not, see <https://www.gnu.org/licenses/>.            */
 #include <pybind11/pybind11.h>
 #include "_polygon.hpp"
+#include "_svg.hpp"
 void wrap_polygon(pybind11::module &m){
   using namespace polystar;
   using namespace polystar::polygon;
@@ -28,6 +29,9 @@ void wrap_polygon(pybind11::module &m){
   py::class_<Poly<int,Array2>> coord(m, "CoordinatePolygon");
   define_polygon_inits<int>(coord);
   define_polygon<int>(coord);
+
+  define_svg_animation<Poly<double,Array2>>(m);
+  define_svg_animation<Poly<int,Array2>>(m);
 
 //  py::class_<Poly<double,LVec>> lvec(m, "LPolyhedron");
 //  define_polygon<double>(lvec);
