@@ -7,7 +7,7 @@
 #include <iostream>
 #include <algorithm> // min, max
 #include <fstream>   // ofstream
-#include <math.h>    // NAN
+#include <cmath>    // NAN
 #include <map>
 #include <deque>
 #include <vector>
@@ -64,10 +64,10 @@ namespace SVG {
             /** Return the smallest number or the number that is not NAN
              *  Returns NAN if both are NAN
              */
-            if (isnan(first) && isnan(second))
+            if (std::isnan(first) && std::isnan(second))
                 return NAN;
-            else if (isnan(first) || isnan(second))
-                return isnan(first) ? second : first;
+            else if (std::isnan(first) || std::isnan(second))
+                return std::isnan(first) ? second : first;
             else
                 return std::min(first, second);
         }
@@ -77,10 +77,10 @@ namespace SVG {
             /** Return the largest number or the number that is not NAN
             *  Returns NAN if both are NAN
             */
-            if (isnan(first) && isnan(second))
+            if (std::isnan(first) && std::isnan(second))
                 return NAN;
-            else if (isnan(first) || isnan(second))
-                return isnan(first) ? second : first;
+            else if (std::isnan(first) || std::isnan(second))
+                return std::isnan(first) ? second : first;
             else
                 return std::max(first, second);
         }
