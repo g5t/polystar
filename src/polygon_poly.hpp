@@ -14,6 +14,7 @@
 #include "polygon_network.hpp"
 
 #include "svg.hpp"
+#include "triangle.hpp"
 
 namespace polystar::polygon{
   using ind_t = polystar::ind_t;
@@ -71,9 +72,10 @@ namespace polystar::polygon{
     // methods
     [[nodiscard]] Poly<T,A> convex_hull() const {return Poly(vertices_);}
     [[nodiscard]] Poly<T,A> simplify() const {return Poly(vertices_, wires_.simplify(vertices_));}
-    Network<Wire,T,A> triangulate() const {
-      return wires_.triangulate(vertices_);
-    }
+//    Network<Wire,T,A> triangulate() const {
+//      return wires_.triangulate(vertices_);
+//    }
+    Network<Wire,T,A> triangulate() const { return polystar::triangle::triangulate<Wire>(vertices_, wires_); }
     [[nodiscard]] bool is_not_approx(const Poly<T,A> & that, const T tol=T(0), const int dig=1) const {
       bool permuted{false};
       if (vertices_ != that.vertices()){

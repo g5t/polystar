@@ -23,7 +23,7 @@ function(git_fetch package version source required)
     endif()
 endfunction()
 
-function(git_fetch_hash package hash source)
+function(git_fetch_hash package source hash subdir)
     find_package(${package} QUIET)
     if (${${package}_FOUND})
         message(STATUS "Found ${package}")

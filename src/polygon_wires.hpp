@@ -111,6 +111,7 @@ namespace polystar::polygon {
       /* 1. Pick an internal wire which has not had an edge failure
             If there are no such wires, the polygon can not be simplified.
          2. Find an edge between one of its vertices and a border vertex which is inside the polygon
+            AND WHICH IS NOT ALREADY IN THE WIRE TWICE!
             (The edge must be *inside* the border and *outside* all wires!)
             If there are no such edges, record the failure and go back to 1.
          3. Insert the wire in the border (the chosen border vertex and wire vertex are visited twice each)
@@ -123,12 +124,21 @@ namespace polystar::polygon {
       using p_t = typename wire_t::edge_t;
       using pp_t = std::pair<p_t, p_t>;
 
-      while (failures < ws.size()){
+      // Count how many times each vertex appears in the border -- update this going along
+      std::vector<size_t> border_counts(vertices.size(0), 0u); // the border and wires index vertices_, so this should be safe
+      for (const auto & x: b) border_counts[x]++;
+      size_t max_counts{2};
+      // allow for the maximum connections at one point to be increased if we otherwise fail
+      while (failures < ws.size() && max_counts < 10u){
+        std::cout << "border counts: ";
+        for (const auto & bc: border_counts) std::cout << bc << " ";
+        std::cout << "\n";
         auto w = ws[failures];
         // find the possible joining edges
         std::vector<pp_t> choices;
         choices.reserve(w.size() * b.size());
-        for (ind_t i=0; i < w.size(); ++i){ for (ind_t j=0; j < b.size(); ++j){
+        for (ind_t i=0; i < w.size(); ++i) if (border_counts[w[i]] < max_counts) {
+          for (ind_t j=0; j < b.size(); ++j) if (border_counts[b[j]] < max_counts) {
             p_t se{w[i], b[j]};
             if (!intersects(vertices, se, vertices, end_type::neither)) choices.emplace_back(std::make_pair(i, j), se);
           }
@@ -136,21 +146,23 @@ namespace polystar::polygon {
         if (choices.empty()) {
           ++failures;
         } else {
-          // pick *which* possible edge we want, maybe the shorted one is best?
+          // pick *which* possible edge we want, maybe the shortest one is best?
           std::vector<std::pair<double, pp_t>> lengths;
           lengths.reserve(choices.size());
           std::transform(choices.begin(), choices.end(), std::back_inserter(lengths), [&](const auto & ch){
             return std::make_pair(norm(vertices.view(ch.second.first) - vertices.view(ch.second.second)).sum(), ch);
           });
-//          std::cout << "possible edges:\n";
-//          for (const auto & [l, e]: lengths)
-//            std::cout << "[" << e.first.first << "][" << e.first.second << "]("
-//                      << e.second.first << "--" << e.second.second << ") " << l << "\n";
+          std::cout << "possible edges:\n";
+          for (const auto & [l, e]: lengths)
+            std::cout << "[" << e.first.first << "][" << e.first.second << "]("
+                      << e.second.first << "--" << e.second.second << ") " << l
+                      << " with " << border_counts[e.second.first]  << " and " << border_counts[e.second.second]
+                      << " pre existing connections \n";
 
           auto ptr = std::min_element(lengths.begin(), lengths.end(),
                                       [](const auto & a, const auto & b){return a.first < b.first;});
-          auto best = ptr->second.first;
-//          std::cout << "best edge indexes: (" << best.first << "--" << best.second << ")\n";
+          auto best = ptr->second.first; // (i, j) from above, index into w and b respectively
+          std::cout << "best edge indexes: (" << best.first << "--" << best.second << ")\n";
           // Add the edge border[bi] -- wire[failures][wi]
           // The new border is b[:bi] -- w[wi:] -- w[:wi] -- b[bi:]
           // Where x[:n] means [0,n] {upper bound inclusive} and x[n:] means [n,x.size()) {upper bound exclusive}
@@ -160,6 +172,11 @@ namespace polystar::polygon {
           for (size_t i=best.first; i<w.size(); ++i) new_b.push_back(w[i]);
           for (size_t i=0; i<std::min(static_cast<size_t>(best.first+1), w.size()); ++i) new_b.push_back(w[i]);
           for (size_t i=best.second; i<b.size(); ++i) new_b.push_back(b[i]);
+          // record that the wires are now part of the border
+          for (const auto & wi: w) border_counts[wi]+=1;
+          // and that both the connected wire point and connected border point now have an extra connection:
+          border_counts[w[best.first]]+=1;
+          border_counts[b[best.second]]+=1;
 
           // the border is now new_b
           b = Wire(new_b);
@@ -167,6 +184,12 @@ namespace polystar::polygon {
           ws.erase(ws.begin()+failures);
           // reset the failures counter
           failures = 0u;
+        }
+        if (failures >= ws.size()) {
+          // relax the repeated border point restriction (this makes triangulation harder)
+          max_counts++;
+          // start again from the front of the wires list
+          failures = 0;
         }
       }
       if (!ws.empty()) {

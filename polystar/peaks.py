@@ -87,4 +87,36 @@ def polyplot(p, indexes=False):
         for i, x in enumerate(p.vertices):
             pp.text(*x, f'{i}')
 
+# # This 'worked' before switching to Triangle.
+# # Now the board *SHOULD NOT* be simplified before triangulating, as we lose hole-information
+#def from_file(filename, dilate=0):
+#  import _polystar as p
+#  import numpy as np
+#  loaded = np.load(filename)
+#  bitmap = p.BitmapI(loaded)
+#  if dilate > 0:
+#    bitmap = bitmap.dilate(dilate)
+#
+#  holes = [poly.inverse for poly in bitmap.extract_image_polygons(1)]
+#  lx, ly = loaded.shape
+#  border = np.array([[0,0],[0,lx],[ly,lx],[ly,0]])
+#  board = p.CoordinatePolygon(border) + holes
+#  simple = board.simplify()
+#  triangulated = simple.triangulate()
+#  return board, simple, triangulated
+
+def from_file(filename, dilate=0):
+  import _polystar as p
+  import numpy as np
+  loaded = np.load(filename)
+  bitmap = p.BitmapI(loaded)
+  if dilate > 0:
+    bitmap = bitmap.dilate(dilate)
+
+  holes = [poly.inverse for poly in bitmap.extract_image_polygons(1)]
+  lx, ly = loaded.shape
+  border = np.array([[0,0],[0,lx],[ly,lx],[ly,0]])
+  board = p.CoordinatePolygon(border) + holes
+  triangulated = board.triangulate()
+  return board, triangulated
 

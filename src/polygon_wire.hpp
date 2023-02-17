@@ -23,7 +23,6 @@ namespace polystar::polygon {
     using base_t = std::vector<ind_t>;
   private:
     inline ind_t vi(size_t i) const { return operator[](i); }
-
     inline ind_t vj(size_t i) const { return operator[]((i + 1) % size()); }
 
   public:
@@ -154,7 +153,6 @@ namespace polystar::polygon {
         if (!not_tri && std::find(convex.begin(), convex.end(), ng) != convex.end()) {
           auto tri = Wire(ng);
 //          std::cout << "Inner (concave) points" << ip;
-//          auto cinc = tri.contains(ip, x, end_type::neither);
           auto cinc = tri.contains(ip, x);
           // Complex polygons can visit the same point multiple times, and it may be concave once and convex another
           for (ind_t i=0; i<ip.size(0); ++i) if (cinc[i] && tri.uses(ip.view(i), x)) cinc[i] = false;
@@ -198,6 +196,20 @@ namespace polystar::polygon {
         *ptr = ng;
       };
 
+      auto ear_measure = [&](const auto & ear){
+        const auto & v0{x.view(ear[0])};
+        const auto & v1{x.view(ear[1])};
+        const auto & v2{x.view(ear[2])};
+        auto a = norm(v0 - v1).sum();
+        auto b = norm(v1 - v2).sum();
+        auto c = norm(v2 - v0).sum();
+        auto area2 = (a+b+c)*(-a+b+c)*(a-b+c)*(a+b-c);
+        auto area = std::sqrt(area2);
+        // true circumscribed diameter, but we don't need this
+        // auto d = std::min(std::max(std::max(a, b), c), a * b * c / 2 / area);
+        return area * area2 / (a * b * c);
+      };
+
 
       // now we only need to work with the known ears (and check the neighbors after removing each)
       std::vector<Wire> triangles;
@@ -211,18 +223,20 @@ namespace polystar::polygon {
 //        std::cout << "\nRemaining ear indexes: ";
 //        for (const auto & e: ears) std::cout << "(" << e[0] << " " << e[1] << " " << e[2] << ") ";
 //        std::cout << "\n";
-        // pick the first ear to be the first triangle, erase it from the ears at this point:
+        // pick the most compact ear to be the first triangle, erase it from the ears at this point:
+        std::partial_sort(ears.begin(), ears.begin()+1, ears.end(), [&](const auto & e1, const auto & e2){
+          return ear_measure(e1) > ear_measure(e2);
+        });
         group_t i = ears.front();
         ears.erase(ears.begin());
         // find its group
         auto ptr = std::find(groups.begin(), groups.end(), i);
-        //auto ptr = std::find_if(groups.begin(), groups.end(), [i](const std::array<ind_t,3> & g){return g[1] == i;});
         if (ptr == groups.end()) {
           std::cout << "Remaining groups do not have (" << i[0] << " " << i[1] << " " << i[2]  << ")? \n";
           for (const auto & g: groups) std::cout << "(" << g[0] << " " << g[1] << " " << g[2]  << ")\n";
           throw std::runtime_error("triangle indexing error");
         }
-//        std::cout << "Selected is " << ptr->operator[](0) << " " << ptr->operator[](1) << " " << ptr->operator[](2) << "\n";
+        std::cout << "Selected is " << ptr->operator[](0) << " " << ptr->operator[](1) << " " << ptr->operator[](2) << " with area ratio " << ear_measure(*ptr) << "\n";
         // construct the triangle
         auto tri = Wire(*ptr);
         triangles.push_back(tri);
@@ -292,7 +306,25 @@ namespace polystar::polygon {
     }
 
     template<class T, template<class> class A>
-    std::vector<bool> contains(const A<T> & point, const A<T> & x) const{
+      A<double> find_contained_point(const A<T>& x) const {
+      // Return *a* point within the closed border of the polygon wire
+      for (size_t i=0; i<size()-1; ++i){
+        auto pi = x.view(vi(i));
+        // check the vertices not next to this one
+        for (size_t j=0; j<size(); ++j) if (i > j ? i - j > 1 : j - i > 1) {
+          // make sure there isn't a crossing we should worry about
+          if (std::count(begin(), end(), vi(j)) == 1){
+            auto mid = 0.5 * (pi + x.view(vi(j)));
+            if (contains(mid, x)[0]) return mid;
+          }
+        }
+      }
+      // No found contained point. This seems very unlikely, but I don't know what to do so punt
+      return 1.0*x;
+    }
+
+    template<class T, class S, template<class> class A>
+    std::vector<bool> contains(const A<S> & point, const A<T> & x) const{
       auto wn = winding_number(point, x);
       std::vector<bool> out;
       out.reserve(wn.size());
@@ -300,8 +332,8 @@ namespace polystar::polygon {
       return out;
     }
 
-    template<class T, template<class> class A>
-    std::vector<size_t> winding_number(const A<T> & point, const A<T> & x) const {
+    template<class T, class R, template<class> class A, class S=std::common_type_t<T,R>>
+    std::vector<size_t> winding_number(const A<R> & point, const A<T> & x) const {
       std::vector<size_t> out;
       out.reserve(point.size(0));
       for (ind_t i=0; i<point.size(0); ++i) {
@@ -309,14 +341,16 @@ namespace polystar::polygon {
         for (size_t j=0; j<size(); ++j){
           auto e = edge(j);
           // points are all (x, y)
-          if (x.val(e.first, 1) <= point.val(i, 1)) {
-            if(x.val(e.second, 1) > point.val(i, 1)) {
+          if (static_cast<S>(x.val(e.first, 1)) <= static_cast<S>(point.val(i, 1))) {
+            if(static_cast<S>(x.val(e.second, 1)) > static_cast<S>(point.val(i, 1))) {
               // upwards crossing with infinite horizontal line from point
-              if (cross2d(x.view(e.second) - x.view(e.first), point.view(i) - x.view(e.first)).sum() > 0) ++wn;
+              if (cross2d(x.view(e.second) - x.view(e.first),
+                          point.view(i) - x.view(e.first)).sum() > 0) ++wn;
             }
           } else {
-            if (x.val(e.second, 1) <= point.val(i, 1)) {
-              if (cross2d(x.view(e.second) - x.view(e.first), point.view(i) - x.view(e.first)).sum() < 0) --wn;
+            if (static_cast<S>(x.val(e.second, 1) <= point.val(i, 1))) {
+              if (cross2d(x.view(e.second) - x.view(e.first),
+                          point.view(i) - x.view(e.first)).sum() < 0) --wn;
             }
           }
         }

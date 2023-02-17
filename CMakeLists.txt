@@ -180,6 +180,7 @@ endif()
 
 include(polystar-openmp)
 include(polystar-hdf5)
+include(polystar-triangle)
 include(polystar-doxygen)
 
 if (NOT SKBUILD)

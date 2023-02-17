@@ -7,6 +7,7 @@ try:
     from ._polystar import Polygon, CoordinatePolygon
     from ._polystar import BitmapI, BitmapF, BitmapD
     from ._polystar import Network, CoordinateNetwork
+    from ._polystar import SVG, animated_svg
 
     # Store types for use in, e.g., the plotting routines
     __polygon_types__ = (Polygon, CoordinatePolygon)
