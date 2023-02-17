@@ -40,12 +40,14 @@ namespace polystar::polygon {
       }
       find_external_edges();
     }
-    void off_limits(const W & of) {
-      // only accept setting the off limits positions if it does not remove all known positions
-      for (const auto & i: indexes()) if (std::find(of.begin(), of.end(), i) == of.end()) {
-        off_limits_=of;
-        break;
-      }
+//    void off_limits(const W & of) {
+//      // only accept setting the off limits positions if it does not remove all known positions
+//      for (const auto & i: indexes()) if (std::find(of.begin(), of.end(), i) == of.end()) {
+//        off_limits_=of;
+//        break;
+//      }
+//    }
+    void off_limits(const W &) {
     }
 
     [[nodiscard]] size_t size() const { return map_.size(); }
@@ -135,7 +137,7 @@ namespace polystar::polygon {
         auto pg = cat(0, out.view(out.size(0) - 1), to);
         if (!contains(pg, {0, 1})){
           // can't skip the whole way -- check if we can skip part way
-          i = skip_ahead_to(out, i, path);
+//          i = skip_ahead_to(out, i, path);
           out = cat(0, out, vertices_.view(path[i]));
         }
       }
