@@ -120,3 +120,26 @@ def from_file(filename, dilate=0):
   triangulated = board.triangulate()
   return board, triangulated
 
+
+def from_numpy_stack_file(filename):
+    try:
+        import _polystar as p
+    except:
+        import polystar as p
+
+    def combine(hs, nx , ny):
+        border = p.CoordinatePolygon([[0, 0], [0, nx], [ny, ny], [nx, 0]])
+        return border + hs
+
+    loaded = np.load(filename)  #
+    nx, ny, time_series = loaded.shape
+
+    bitmaps = [p.BitmapI(o) for o in np.einsum('ijk->kij', loaded)]
+
+    holes = [[poly.inverse for poly in b.extract_image_polygons(1)] for b in bitmaps]
+
+    combined = [combine(h, nx, ny) for h in holes]
+
+    networks = [c.triangulate() for c in combined]
+
+    return {'loaded': loaded, 'bitmap': bitmaps, 'hole': holes, 'combined': combined, 'network': networks}
