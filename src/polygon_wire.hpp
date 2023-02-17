@@ -486,10 +486,23 @@ namespace polystar::polygon {
 
     template<class T, template<class> class A>
     void add_to_svg(SVG::Path & path, const A<T>& x) const {
-      auto first_and_last = front();
+      // don't attempt to write a non-closed wire path
+      if (size() < 3) return;
+      auto first_and_last = vi(0);
+      if (first_and_last >= x.size(0)) {
+        std::cout << "Wire to path conversion failure due to out-of-bounds vertex index " << first_and_last
+                  << " for length " << x.size(0) << " vertex vector\n";
+        return;
+      }
       path.move_to(x.val(first_and_last, 0), x.val(first_and_last, 1));
-      for (auto ptr=begin()+1; ptr!=end(); ++ptr){
-        path.line_to(x.val(*ptr, 0), x.val(*ptr, 1));
+      size_t skip=0;
+      for (const auto & i: *this) if (skip++) {
+        if (i < x.size(0)){
+          path.line_to(x.val(i, 0), x.val(i, 1));
+        } else {
+          std::cout << "Wire to path conversion failure due to out-of-bounds vertex index " << i
+                    << " for length " << x.size(0) << " vertex vector\n";
+        }
       }
       // close the wire
       path.line_to(x.val(first_and_last, 0), x.val(first_and_last, 1));

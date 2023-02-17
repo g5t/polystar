@@ -13,7 +13,7 @@ namespace polystar::triangle {
       triangleio in;
 
       // fill the triangleio:
-      in.pointlist = new double[2*v.size(0)];
+      in.pointlist = new double[20*v.size(0)]; // allocate too much memory Triangle decides to add points
       in.numberofpoints = static_cast<int>(v.size(0));
       in.pointattributelist = (double *) nullptr;
       in.pointmarkerlist = (int *) nullptr;
@@ -35,9 +35,9 @@ namespace polystar::triangle {
       auto holes = ws.wires();
       size_t hole_edge_count{0};
       for (const auto & h: holes) hole_edge_count += h.size();
-      in.segmentlist = new int[2*(border.size() + hole_edge_count)];
+      in.segmentlist = new int[20*(border.size() + hole_edge_count)];
       in.numberofsegments = static_cast<int>(border.size()+hole_edge_count);
-      in.segmentmarkerlist = new int[border.size()+hole_edge_count];
+      in.segmentmarkerlist = nullptr;
 
       size_t offset{0};
       for (size_t i=0; i<border.size(); ++i){
@@ -101,17 +101,37 @@ namespace polystar::triangle {
       auto poly_size = static_cast<size_t>(in.numberofcorners);
       for (int i=0; i<in.numberoftriangles; ++i){
         X tri;
-        tri.reserve(poly_size);
+        tri.reserve(in.numberofcorners);
         for (size_t j=0; j<poly_size; ++j) tri.push_back(in.trianglelist[offset++]);
+        // protect against inserted extra vertices?
+        //if (std::all_of(tri.begin(), tri.end(), [&](const auto n){return n < v.size(0);}))
         triangles.push_back(tri);
       }
-
-      // Now what?
-      auto network = polystar::polygon::Network<X,T,A>(triangles, v);
+      auto out_v = A<T>(in.numberofpoints, 2);
+      for (int i=0; i<in.numberofpoints; ++i){
+        out_v.val(i, 0) = in.pointlist[2*i];
+        out_v.val(i, 1) = in.pointlist[2*i + 1];
+      }
+      auto network = polystar::polygon::Network<X,T,A>(triangles, out_v);
 
       // cleanup
       triangle_context_destroy(ctx);
+      // delete the memory we allocated
+      delete[] in.pointlist;
+      delete[] in.segmentlist;
+      delete[] in.holelist;
+      // plus free what Triangle (may have) allocated
+      if (in.pointattributelist) free(in.pointattributelist);
+      if (in.pointmarkerlist) free(in.pointmarkerlist);
+      if (in.trianglelist) free(in.trianglelist);
+      if (in.triangleattributelist) free(in.triangleattributelist);
+      if (in.trianglearealist) free(in.trianglearealist);
+      if (in.neighborlist) free(in.neighborlist);
+      if (in.segmentmarkerlist) free(in.segmentmarkerlist);
+      if (in.regionlist) free(in.regionlist);
+      if (in.edgelist) free(in.edgelist);
+      if (in.edgemarkerlist) free(in.edgemarkerlist);
 
-      return network;
+    return network;
     }
 }
