@@ -5,7 +5,7 @@ on:
   pull_request:
 
 concurrency :
-  group: ${{ github.workflow }}-${{ github.ref == 'refs/head/main' && github.run_number || github.ref }}
+  group: "${{ github.workflow }}-${{ github.ref == 'refs/head/main' && github.run_number || github.ref }}"
   cancel-in-progress: true
 
 jobs:
@@ -38,16 +38,13 @@ jobs:
           cache-environment: true
       - run: echo "pythonInterpreter=`which python`" >> $GITHUB_ENV
       - if: startsWith(matrix.variant.os, 'macos')
-        run: brew install tree; tree /Users/runner/.conan || echo "No conan directory"
+        run: brew install tree; tree /Users/runner/.conan2 || echo "No conan2 directory"
       - name: configure
         run: cmake -S . -B build -D CMAKE_BUILD_TYPE=${{ matrix.cmake-type }} -D PYTHON3_EXECUTABLE=${{ env.pythonInterpreter }}
       - if: startsWith(matrix.variant.os, 'macos')
-        run: tree /Users/runner/.conan || echo "No conan directory"
-      - name: Get number of CPU cores
-        uses: SimenB/github-actions-cpu-cores@v2
-        id: cpu-cores
+        run: tree /Users/runner/.conan2 || echo "No conan2 directory"
       - name: build
-        run: cmake --build build --config ${{ matrix.cmake-type }} --parallel ${{ steps.cpu-cores.outputs.count }}
+        run: cmake --build build --config ${{ matrix.cmake-type }} -j
       - name: test
         working-directory: build
-        run: ctest -C ${{ matrix.cmake-type }} --output-on-failure --parallel ${{ steps.cpu-cores.outputs.count }}
+        run: ctest -C ${{ matrix.cmake-type }} --output-on-failure -j
