@@ -3,6 +3,16 @@ if (APPLE)
     set(CONAN_LLVM_OPENMP llvm-openmp/11.1.0)
 endif()
 
+# Force re-finding the Conan binary -- necessary for rebuilding under pip build isolation w/ cmake cache outside
+unset(CONAN_CMD CACHE)
+#find_program(CONAN_CMD conan)
+#if (CONAN_CMD)
+#    message(STATUS "Found Conan: ${CONAN_CMD}")
+#    set(CONAN_CMD ${CONAN_CMD} CACHE STRING "Path to Conan executable" FORCE)
+#else()
+#    message(ERROR "Conan not found, please install it")
+#endif()
+
 # Use Conan to fetch/build HDF5, the manylinux2014 image has HDF5 v1.8 which causes errors in testing
 if (NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
     message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")

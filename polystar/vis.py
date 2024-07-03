@@ -2,10 +2,11 @@
 
 See `VisPy <https://vispy.org>`_ for installation and configuration directions
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from polystar import Polyhedron
 from vispy.color import Color
 from typing import List
+
 
 @dataclass
 class VisPolyhedron:
@@ -30,8 +31,8 @@ class VisPolyhedron:
     basis vectors will be used to convert the vertices into an orthonormal frame during object initialisation.
     """
     polyhedron: Polyhedron
-    face_color: Color = Color('black')
-    edge_color: Color = Color('black')
+    face_color: Color = field(default_factory=lambda: Color('black'))
+    edge_color: Color = field(default_factory=lambda: Color('black'))
     fill: bool = True
     outline: bool = True
     opacity: float = 0.2
@@ -177,7 +178,7 @@ def make_colours(n, color=None):
     [Color('red'), Color('blue'), Color('green'), Color('red'), Color('blue'), Color('green'), Color('red')]
 
     >>> from vispy.color import Color
-    >>> make_colors(4, Color('black'))
+    >>> make_colours(4, Color('black'))
     [Color('black'), Color('black'), Color('black'), Color('black')]
     """
     if color is None:

@@ -26,10 +26,22 @@ interact with polyhedron and polygon routines.
 .. autosummary::
     :toctree: _generate
 """
-from .bound import *
-
-try:
-    from . import vis
-except ModuleNotFoundError:
-    # Missing VisPy does not preclude use of module 
-    pass
+from .bound import (
+    __version__,
+    version,
+    ApproxConfig,
+    Polyhedron,
+    Polygon,
+    CoordinatePolygon,
+    BitmapI,
+    BitmapF,
+    BitmapD,
+    Network,
+    CoordinateNetwork,
+    SVG,
+    animated_svg,
+    __polygon_types__,
+    __polyhedron_types__,
+    __bitmap_types__,
+    __network_types__,
+)
