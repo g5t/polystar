@@ -63,11 +63,11 @@
 
 // The maximum number of characters in a file name (including the null).
 
-#define FILENAMESIZE 1024
+#define TETGEN_FILENAMESIZE 1024
 
 // The maximum number of chars in a line read from a file (including the null).
 
-#define INPUTLINESIZE 2048
+#define TETGEN_INPUTLINESIZE 2048
 
 // C standard libraries to perform Input/output operations, general utililities,
 //   manipulate strings and arrays, compute common mathematical operations,

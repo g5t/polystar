@@ -1,7 +1,11 @@
 /** @file */
 #pragma once
-#define PI 3.14159265
-#define RAD_TO_DEG (180/PI)
+#ifndef SVG_PI
+#define SVG_PI 3.14159265 // Original
+// #define SVG_PI 3.141592653589793238462643383279502884197169399375105820974944592308 // from Triangle
+#endif
+#define RAD_TO_DEG (180/SVG_PI)
+#define DEG_TO_RAD (SVG_PI/180)
 #define SVG_TYPE_CHECK static_assert(std::is_base_of<Element, T>::value, "Child must be an SVG element.")
 #define APPROX_EQUALS(x, y, tol) bool(abs(x - y) < tol)
 #include <iostream>
@@ -10,6 +14,7 @@
 #include <cmath>    // NAN
 #include <map>
 #include <deque>
+#include <utility>
 #include <vector>
 #include <string>
 #include <sstream> // stringstream
@@ -42,12 +47,12 @@ namespace SVG {
 
     inline std::string to_string(const double& value);
     inline std::string to_string(const Point& point);
-    inline std::string to_string(const std::map<std::string, AttributeMap>& css, const size_t indent_level=0);
+    inline std::string to_string(const std::map<std::string, AttributeMap>& css, size_t indent_level=0);
 
     std::vector<Point> bounding_polygon(const std::vector<Shape*>& shapes);
-    SVG frame_animate(std::vector<SVG>& frames, const double fps);
+    SVG frame_animate(std::vector<SVG>& frames, double fps);
     SVG merge(SVG& left, SVG& right, const Margins& margins = DEFAULT_MARGINS);
-    SVG merge(std::vector<SVG>& frames, const double width, const int max_frame_width);
+    SVG merge(std::vector<SVG>& frames, double width, int max_frame_width);
 
     /** @namespace util
      *  @brief Various utility and mathematical functions
@@ -103,6 +108,8 @@ namespace SVG {
 
             if (points.size() < 3) return {}; // Need at least three points
             std::vector<Point> hull;
+            auto n_points = static_cast<int>(points.size());
+            hull.reserve(n_points);
 
             // Find leftmost point (ties don't matter)
             int left = 0;
@@ -116,8 +123,8 @@ namespace SVG {
                 hull.push_back(points[current]);
 
                 // Keep moving counterclockwise
-                next = (current + 1) % points.size();
-                for (size_t i = 0; i < points.size(); i++) {
+                next = (current + 1) % n_points;
+                for (int i = 0; i < n_points; i++) {
                     // We've found a more counterclockwise point --> update next
                     if (orientation(points[current], points[next], points[i]) == COUNTERCLOCKWISE)
                         next = (int)i;
@@ -137,13 +144,12 @@ namespace SVG {
              *  a convex polygon
              */
             std::vector<Point> ret;
-            for (double degree = 0; degree < 360; degree += 360/n) {
-                ret.push_back(Point(
-                    a + radius * cos(degree * (PI/180)), // 1 degree = pi/180 radians
-                    b + radius * sin(degree * (PI/180))
-                ));
+            ret.reserve(n+1);
+            double degree = 0;
+            while (degree < 360.){
+                ret.emplace_back(a + radius * cos(degree * RAD_TO_DEG), b + radius * sin(degree * RAD_TO_DEG));
+                degree += 360./n;
             }
-
             return ret;
         }
     }
@@ -167,7 +173,7 @@ namespace SVG {
     class AttributeMap {
     public:
         struct AttrSetter {
-            AttrSetter(SVGAttrib::mapped_type& _attr) : attr(_attr) {};
+            explicit AttrSetter(SVGAttrib::mapped_type& _attr) : attr(_attr) {};
             SVGAttrib::mapped_type& attr;
 
             template<typename T>
@@ -178,18 +184,18 @@ namespace SVG {
         };
 
         AttributeMap() = default;
-        AttributeMap(SVGAttrib _attr) : attr(_attr) {};
-        SVGAttrib attr;
+        explicit AttributeMap(SVGAttrib _attr) : attr(std::move(_attr)) {};
+        SVGAttrib attr{};
 
         template<typename T>
         AttributeMap& set_attr(const std::string key, T value) {
-            this->attr[key] = std::to_string(value);
+            attr[key] = std::to_string(value);
             return *this;
         }
 
         AttrSetter set_attr(const std::string key) {
-            if (this->attr.find(key) == this->attr.end()) this->attr[key] = "";
-            return AttrSetter(this->attr.at(key));
+            if (attr.find(key) == attr.end()) attr[key] = "";
+            return AttrSetter(attr.at(key));
         };
     };
 
@@ -202,21 +208,21 @@ namespace SVG {
     template<>
     inline AttributeMap& AttributeMap::set_attr(const std::string key, const double value) {
         /** Modify the attribute specified by key */
-        this->attr[key] = to_string(value);
+        attr[key] = to_string(value);
         return *this;
     }
 
     template<>
     inline AttributeMap& AttributeMap::set_attr(const std::string key, const char * value) {
         /** Modify the attribute specified by key */
-        this->attr[key] = value;
+        attr[key] = value;
         return *this;
     }
 
     template<>
     inline AttributeMap& AttributeMap::set_attr(const std::string key, const std::string value) {
         /** Modify the attribute specified by key */
-        this->attr[key] = value;
+        attr[key] = value;
         return *this;
     }
 

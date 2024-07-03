@@ -69,7 +69,7 @@
 bool tetgenio::load_node_call(FILE* infile, int markers, int uvflag, 
                               char* infilename)
 {
-  char inputline[INPUTLINESIZE];
+  char inputline[TETGEN_INPUTLINESIZE];
   char *stringptr;
   REAL x, y, z, attrib;
   int firstnode, currentmarker;
@@ -190,8 +190,8 @@ bool tetgenio::load_node_call(FILE* infile, int markers, int uvflag,
 bool tetgenio::load_node(char* filebasename)
 {
   FILE *infile;
-  char innodefilename[FILENAMESIZE];
-  char inputline[INPUTLINESIZE];
+  char innodefilename[TETGEN_FILENAMESIZE];
+  char inputline[TETGEN_INPUTLINESIZE];
   char *stringptr;
   bool okflag;
   int markers;
@@ -268,8 +268,8 @@ bool tetgenio::load_node(char* filebasename)
 bool tetgenio::load_edge(char* filebasename)
 {
   FILE *infile;
-  char inedgefilename[FILENAMESIZE];
-  char inputline[INPUTLINESIZE];
+  char inedgefilename[TETGEN_FILENAMESIZE];
+  char inputline[TETGEN_INPUTLINESIZE];
   char *stringptr;
   int markers, corner;
   int index;
@@ -349,8 +349,8 @@ bool tetgenio::load_edge(char* filebasename)
 bool tetgenio::load_face(char* filebasename)
 {
   FILE *infile;
-  char infilename[FILENAMESIZE];
-  char inputline[INPUTLINESIZE];
+  char infilename[TETGEN_FILENAMESIZE];
+  char inputline[TETGEN_INPUTLINESIZE];
   char *stringptr;
   REAL attrib;
   int markers, corner;
@@ -445,8 +445,8 @@ bool tetgenio::load_face(char* filebasename)
 bool tetgenio::load_tet(char* filebasename)
 {
   FILE *infile;
-  char infilename[FILENAMESIZE];
-  char inputline[INPUTLINESIZE];
+  char infilename[TETGEN_FILENAMESIZE];
+  char inputline[TETGEN_INPUTLINESIZE];
   char *stringptr;
   REAL attrib;
   int corner;
@@ -552,9 +552,9 @@ bool tetgenio::load_tet(char* filebasename)
 bool tetgenio::load_vol(char* filebasename)
 {
   FILE *infile;
-  char inelefilename[FILENAMESIZE];
-  char infilename[FILENAMESIZE];
-  char inputline[INPUTLINESIZE];
+  char inelefilename[TETGEN_FILENAMESIZE];
+  char infilename[TETGEN_FILENAMESIZE];
+  char inputline[TETGEN_INPUTLINESIZE];
   char *stringptr; 
   REAL volume;
   int volelements;
@@ -614,8 +614,8 @@ bool tetgenio::load_vol(char* filebasename)
 bool tetgenio::load_var(char* filebasename)
 {
   FILE *infile;
-  char varfilename[FILENAMESIZE];
-  char inputline[INPUTLINESIZE];
+  char varfilename[TETGEN_FILENAMESIZE];
+  char inputline[TETGEN_INPUTLINESIZE];
   char *stringptr;
   int index;
   int i;
@@ -735,8 +735,8 @@ bool tetgenio::load_var(char* filebasename)
 bool tetgenio::load_mtr(char* filebasename)
 {
   FILE *infile;
-  char mtrfilename[FILENAMESIZE];
-  char inputline[INPUTLINESIZE];
+  char mtrfilename[TETGEN_FILENAMESIZE];
+  char inputline[TETGEN_INPUTLINESIZE];
   char *stringptr;
   REAL mtr;
   int ptnum;
@@ -808,7 +808,7 @@ bool tetgenio::load_mtr(char* filebasename)
 bool tetgenio::load_elem(char* filebasename)
 {
   FILE *infile;
-  char inelemfilename[FILENAMESIZE];
+  char inelemfilename[TETGEN_FILENAMESIZE];
   char line[1024];
 
   strcpy(inelemfilename, filebasename);
@@ -855,9 +855,9 @@ bool tetgenio::load_elem(char* filebasename)
 bool tetgenio::load_poly(char* filebasename)
 {
   FILE *infile;
-  char inpolyfilename[FILENAMESIZE];
-  char insmeshfilename[FILENAMESIZE];
-  char inputline[INPUTLINESIZE];
+  char inpolyfilename[TETGEN_FILENAMESIZE];
+  char insmeshfilename[TETGEN_FILENAMESIZE];
+  char inputline[TETGEN_INPUTLINESIZE];
   char *stringptr, *infilename;
   int smesh, markers, uvflag, currentmarker;
   int index;
@@ -1261,8 +1261,8 @@ bool tetgenio::load_off(char* filebasename)
   FILE *fp;
   tetgenio::facet *f;
   tetgenio::polygon *p;
-  char infilename[FILENAMESIZE];
-  char buffer[INPUTLINESIZE];
+  char infilename[TETGEN_FILENAMESIZE];
+  char buffer[TETGEN_INPUTLINESIZE];
   char *bufferp;
   double *coord;
   int nverts = 0, iverts = 0;
@@ -1275,7 +1275,7 @@ bool tetgenio::load_off(char* filebasename)
   int smallestidx = 0; 
 
   strncpy(infilename, filebasename, 1024 - 1);
-  infilename[FILENAMESIZE - 1] = '\0';
+  infilename[TETGEN_FILENAMESIZE - 1] = '\0';
   if (infilename[0] == '\0') {
     printf("Error:  No filename.\n");
     return false;
@@ -1422,8 +1422,8 @@ bool tetgenio::load_ply(char* filebasename)
   FILE *fp;
   tetgenio::facet *f;
   tetgenio::polygon *p;
-  char infilename[FILENAMESIZE];
-  char buffer[INPUTLINESIZE];
+  char infilename[TETGEN_FILENAMESIZE];
+  char buffer[TETGEN_INPUTLINESIZE];
   char *bufferp, *str;
   double *coord;
   int endheader = 0, format = 0;
@@ -1435,8 +1435,8 @@ bool tetgenio::load_ply(char* filebasename)
   //   smallest index we found in the file. It should be either 0 or 1.
   int smallestidx = 0; 
 
-  strncpy(infilename, filebasename, FILENAMESIZE - 1);
-  infilename[FILENAMESIZE - 1] = '\0';
+  strncpy(infilename, filebasename, TETGEN_FILENAMESIZE - 1);
+  infilename[TETGEN_FILENAMESIZE - 1] = '\0';
   if (infilename[0] == '\0') {
     printf("Error:  No filename.\n");
     return false;
@@ -1653,8 +1653,8 @@ bool tetgenio::load_stl(char* filebasename)
   tetgenmesh::arraypool *plist;
   tetgenio::facet *f;
   tetgenio::polygon *p;
-  char infilename[FILENAMESIZE];
-  char buffer[INPUTLINESIZE];
+  char infilename[TETGEN_FILENAMESIZE];
+  char buffer[TETGEN_INPUTLINESIZE];
   char *bufferp, *str;
   double *coord;
   int solid = 0;
@@ -1662,8 +1662,8 @@ bool tetgenio::load_stl(char* filebasename)
   int nfaces = 0;
   int line_count = 0, i;
 
-  strncpy(infilename, filebasename, FILENAMESIZE - 1);
-  infilename[FILENAMESIZE - 1] = '\0';
+  strncpy(infilename, filebasename, TETGEN_FILENAMESIZE - 1);
+  infilename[TETGEN_FILENAMESIZE - 1] = '\0';
   if (infilename[0] == '\0') {
     printf("Error:  No filename.\n");
     return false;
@@ -1824,8 +1824,8 @@ bool tetgenio::load_medit(char* filebasename, int istetmesh)
   FILE *fp;
   tetgenio::facet *tmpflist, *f;
   tetgenio::polygon *p;
-  char infilename[FILENAMESIZE];
-  char buffer[INPUTLINESIZE];
+  char infilename[TETGEN_FILENAMESIZE];
+  char buffer[TETGEN_INPUTLINESIZE];
   char *bufferp, *str;
   double *coord;
   int *tmpfmlist;
@@ -1840,8 +1840,8 @@ bool tetgenio::load_medit(char* filebasename, int istetmesh)
 
   int smallestidx = 0;
 
-  strncpy(infilename, filebasename, FILENAMESIZE - 1);
-  infilename[FILENAMESIZE - 1] = '\0';
+  strncpy(infilename, filebasename, TETGEN_FILENAMESIZE - 1);
+  infilename[TETGEN_FILENAMESIZE - 1] = '\0';
   if (infilename[0] == '\0') {
     //printf("Error:  No filename.\n");
     return false;
@@ -2181,8 +2181,8 @@ bool tetgenio::load_vtk(char* filebasename)
   FILE *fp;
   tetgenio::facet *f;
   tetgenio::polygon *p;
-  char infilename[FILENAMESIZE];
-  char line[INPUTLINESIZE];
+  char infilename[TETGEN_FILENAMESIZE];
+  char line[TETGEN_INPUTLINESIZE];
   char mode[128], id[256], fmt[64];
   char *bufferp;
   double *coord;
@@ -2199,8 +2199,8 @@ bool tetgenio::load_vtk(char* filebasename)
 
   int smallestidx = 0;
 
-  strncpy(infilename, filebasename, FILENAMESIZE - 1);
-  infilename[FILENAMESIZE - 1] = '\0';
+  strncpy(infilename, filebasename, TETGEN_FILENAMESIZE - 1);
+  infilename[TETGEN_FILENAMESIZE - 1] = '\0';
   if (infilename[0] == '\0') {
     printf("Error:  No filename.\n");
     return false;
@@ -2499,8 +2499,8 @@ bool tetgenio::load_tetmesh(char* filebasename, int object)
 void tetgenio::save_nodes(const char *filebasename)
 {
   FILE *fout;
-  char outnodefilename[FILENAMESIZE];
-  char outmtrfilename[FILENAMESIZE];
+  char outnodefilename[TETGEN_FILENAMESIZE];
+  char outmtrfilename[TETGEN_FILENAMESIZE];
   int i, j;
 
   sprintf(outnodefilename, "%s.node", filebasename);
@@ -2552,7 +2552,7 @@ void tetgenio::save_nodes(const char *filebasename)
 void tetgenio::save_elements(const char* filebasename)
 {
   FILE *fout;
-  char outelefilename[FILENAMESIZE];
+  char outelefilename[TETGEN_FILENAMESIZE];
   int i, j;
 
   sprintf(outelefilename, "%s.ele", filebasename);
@@ -2599,7 +2599,7 @@ void tetgenio::save_elements(const char* filebasename)
 void tetgenio::save_faces(const char* filebasename)
 {
   FILE *fout;
-  char outfacefilename[FILENAMESIZE];
+  char outfacefilename[TETGEN_FILENAMESIZE];
   int i;
 
   sprintf(outfacefilename, "%s.face", filebasename);
@@ -2628,7 +2628,7 @@ void tetgenio::save_faces(const char* filebasename)
 void tetgenio::save_edges(char* filebasename)
 {
   FILE *fout;
-  char outedgefilename[FILENAMESIZE];
+  char outedgefilename[TETGEN_FILENAMESIZE];
   int i;
 
   sprintf(outedgefilename, "%s.edge", filebasename);
@@ -2656,7 +2656,7 @@ void tetgenio::save_edges(char* filebasename)
 void tetgenio::save_neighbors(char* filebasename)
 {
   FILE *fout;
-  char outneighborfilename[FILENAMESIZE];
+  char outneighborfilename[TETGEN_FILENAMESIZE];
   int i;
 
   sprintf(outneighborfilename, "%s.neigh", filebasename);
@@ -2691,7 +2691,7 @@ void tetgenio::save_poly(const char *filebasename)
   FILE *fout;
   facet *f;
   polygon *p;
-  char outpolyfilename[FILENAMESIZE];
+  char outpolyfilename[TETGEN_FILENAMESIZE];
   int i, j, k;
 
   sprintf(outpolyfilename, "%s.poly", filebasename);
@@ -2789,7 +2789,7 @@ void tetgenio::save_poly(const char *filebasename)
 void tetgenio::save_faces2smesh(char* filebasename)
 {
   FILE *fout;
-  char outsmeshfilename[FILENAMESIZE];
+  char outsmeshfilename[TETGEN_FILENAMESIZE];
   int i, j;
 
   sprintf(outsmeshfilename, "%s.smesh", filebasename);
@@ -2842,7 +2842,7 @@ char* tetgenio::readline(char *string, FILE *infile, int *linenumber)
 
   // Search for a non-empty line.
   do {
-    result = fgets(string, INPUTLINESIZE - 1, infile);
+    result = fgets(string, TETGEN_INPUTLINESIZE - 1, infile);
     if (linenumber) (*linenumber)++;
     if (result == (char *) NULL) {
       return (char *) NULL;
@@ -2897,7 +2897,7 @@ char* tetgenio::readnumberline(char *string, FILE *infile, char *)
 
   // Search for something that looks like a number.
   do {
-    result = fgets(string, INPUTLINESIZE, infile);
+    result = fgets(string, TETGEN_INPUTLINESIZE, infile);
     if (result == (char *) NULL) {
       return result;
     }
@@ -33460,7 +33460,7 @@ void tetgenmesh::numberedges()
 void tetgenmesh::outnodes(tetgenio* out)
 {
   FILE *outfile = NULL;
-  char outnodefilename[FILENAMESIZE];
+  char outnodefilename[TETGEN_FILENAMESIZE];
   face parentsh;
   point pointloop;
   int nextras, bmark, marker = 0, weightDT = 0; 
@@ -33662,7 +33662,7 @@ void tetgenmesh::outnodes(tetgenio* out)
 void tetgenmesh::outmetrics(tetgenio* out)
 {
   FILE *outfile = NULL;
-  char outmtrfilename[FILENAMESIZE];
+  char outmtrfilename[TETGEN_FILENAMESIZE];
   point ptloop;
   int mtrindex = 0;
   int i;
@@ -33794,7 +33794,7 @@ void tetgenmesh::outmetrics(tetgenio* out)
 void tetgenmesh::outelements(tetgenio* out)
 {
   FILE *outfile = NULL;
-  char outelefilename[FILENAMESIZE];
+  char outelefilename[TETGEN_FILENAMESIZE];
   tetrahedron* tptr;
   point p1, p2, p3, p4;
   point *extralist;
@@ -33946,7 +33946,7 @@ void tetgenmesh::outelements(tetgenio* out)
 void tetgenmesh::outfaces(tetgenio* out)
 {
   FILE *outfile = NULL;
-  char facefilename[FILENAMESIZE];
+  char facefilename[TETGEN_FILENAMESIZE];
   triface tface, tsymface;
   face checkmark;
   point torg, tdest, tapex;
@@ -34181,7 +34181,7 @@ void tetgenmesh::outfaces(tetgenio* out)
 void tetgenmesh::outhullfaces(tetgenio* out)
 {
   FILE *outfile = NULL;
-  char facefilename[FILENAMESIZE];
+  char facefilename[TETGEN_FILENAMESIZE];
   triface hulltet;
   point torg, tdest, tapex;
   int *elist = NULL;
@@ -34273,7 +34273,7 @@ void tetgenmesh::outhullfaces(tetgenio* out)
 void tetgenmesh::outsubfaces(tetgenio* out)
 {
   FILE *outfile = NULL;
-  char facefilename[FILENAMESIZE];
+  char facefilename[TETGEN_FILENAMESIZE];
   int *elist = NULL;
   int *emlist = NULL;
   int index = 0, index1 = 0, index2 = 0;
@@ -34460,7 +34460,7 @@ void tetgenmesh::outsubfaces(tetgenio* out)
 void tetgenmesh::outedges(tetgenio* out)
 {
   FILE *outfile = NULL;
-  char edgefilename[FILENAMESIZE];
+  char edgefilename[TETGEN_FILENAMESIZE];
   triface tetloop, worktet, spintet;
   face checkseg;
   point torg, tdest;
@@ -34737,7 +34737,7 @@ void tetgenmesh::outedges(tetgenio* out)
 void tetgenmesh::outsubsegments(tetgenio* out)
 {
   FILE *outfile = NULL;
-  char edgefilename[FILENAMESIZE];
+  char edgefilename[TETGEN_FILENAMESIZE];
   int *elist = NULL;
   int index, i;
   face edgeloop;
@@ -34891,7 +34891,7 @@ void tetgenmesh::outsubsegments(tetgenio* out)
 void tetgenmesh::outneighbors(tetgenio* out)
 {
   FILE *outfile = NULL;
-  char neighborfilename[FILENAMESIZE];
+  char neighborfilename[TETGEN_FILENAMESIZE];
   int *nlist = NULL;
   int index = 0;
   triface tetloop, tetsym;
@@ -34992,7 +34992,7 @@ void tetgenmesh::outneighbors(tetgenio* out)
 void tetgenmesh::outvoronoi(tetgenio* out)
 {
   FILE *outfile = NULL;
-  char outfilename[FILENAMESIZE];
+  char outfilename[TETGEN_FILENAMESIZE];
   tetgenio::voroedge *vedge = NULL;
   tetgenio::vorofacet *vfacet = NULL;
   arraypool *tetlist, *ptlist;
@@ -35456,8 +35456,8 @@ void tetgenmesh::outvoronoi(tetgenio* out)
 void tetgenmesh::outsmesh(char* smfilename)
 {
   FILE *outfile;
-  char nodfilename[FILENAMESIZE];
-  char smefilename[FILENAMESIZE];
+  char nodfilename[TETGEN_FILENAMESIZE];
+  char smefilename[TETGEN_FILENAMESIZE];
   face faceloop;
   point p1, p2, p3;
   int firstindex, shift;
@@ -35558,7 +35558,7 @@ void tetgenmesh::outsmesh(char* smfilename)
 void tetgenmesh::outmesh2medit(char* mfilename)
 {
   FILE *outfile;
-  char mefilename[FILENAMESIZE];
+  char mefilename[TETGEN_FILENAMESIZE];
   tetrahedron* tetptr;
   triface tface, tsymface;
   face faceloop, segloop, checkmark;
@@ -35769,7 +35769,7 @@ void tetgenmesh::outmesh2medit(char* mfilename)
 void tetgenmesh::outmesh2vtk(char* ofilename, int mesh_idx)
 {
   FILE *outfile;
-  char vtkfilename[FILENAMESIZE];
+  char vtkfilename[TETGEN_FILENAMESIZE];
   point pointloop, p1, p2, p3, p4;
   tetrahedron* tptr;
   double x, y, z;
@@ -35875,7 +35875,7 @@ void tetgenmesh::outmesh2vtk(char* ofilename, int mesh_idx)
 void tetgenmesh::out_surfmesh_vtk(char* ofilename, int mesh_idx)
 {
   FILE *outfile;
-  char vtkfilename[FILENAMESIZE];
+  char vtkfilename[TETGEN_FILENAMESIZE];
   triface abuttingtet;
   face faceloop;
   point pointloop, torg, tdest, tapex;
