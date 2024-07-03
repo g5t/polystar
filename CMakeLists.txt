@@ -18,7 +18,7 @@ SET(POLYSTAR_INCLUDE_DESTINATION include)
 set(TESTING_TARGET tester)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS ON)
+# set(CMAKE_CXX_EXTENSIONS ON) # this causes conan_provider to set `gnu17` which doesn't exist for MSVC
 
 # Make the availability of testing optional
 option(POLYSTAR_BUILD_TESTING "Build tests for polystar" ON)

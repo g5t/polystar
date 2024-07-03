@@ -44,7 +44,7 @@ jobs:
       - if: startsWith(matrix.variant.os, 'macos')
         run: tree /Users/runner/.conan || echo "No conan directory"
       - name: Get number of CPU cores
-        uses: SimenB/github-actions-cpu-cores@v1.1.0
+        uses: SimenB/github-actions-cpu-cores@v2
         id: cpu-cores
       - name: build
         run: cmake --build build --config ${{ matrix.cmake-type }} --parallel ${{ steps.cpu-cores.outputs.count }}
