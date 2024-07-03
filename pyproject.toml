@@ -4,10 +4,10 @@ requires =[
   "setuptools>=45",
   "setuptools_scm[toml]>=6.2",
   "wheel",
-  "cmake>=3.18.2",
+  "cmake>=3.24",
 #  "numpy==1.13.3; python_version<'3.5'",
 #  "oldest-supported-numpy; python_version>='3.5'",
-  "conan<2",
+  "conan==2.4.1",
 ]
 
 [tool.setuptools_scm]

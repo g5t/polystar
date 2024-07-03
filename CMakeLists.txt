@@ -1,10 +1,13 @@
-cmake_minimum_required(VERSION 3.18.2)
+cmake_minimum_required(VERSION 3.24)
 cmake_policy(SET CMP0076 NEW) # Ensure target_sources converts relative paths
 cmake_policy(SET CMP0017 NEW) # Prefer cmake's own files for include/find_package before CMAKE_MODULE_PATH
 
 list(INSERT CMAKE_MODULE_PATH 0 "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
+set(CMAKE_PROJECT_TOP_LEVEL_INCLUDES "${CMAKE_CURRENT_LIST_DIR}/cmake/conan_provider.cmake")
+
 project(polystar)
+
 set(POLYSTAR_LIBRARY_TARGET polystar)
 set(POLYSTAR_PYTHON_MODULE _polystar)
 set(POLYSTAR_PYTHON_DESTINATION polystar)
@@ -96,8 +99,6 @@ endif (POLYSTAR_PROFILING)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # With GCC 10+ the interproceedural optmization only adds to compilation time without improving performance
 SET(CMAKE_INTERPROCEDURAL_OPTIMIZATION FALSE)
-
-include(polystar-conan)
 
 if (PYTHON_EXECUTABLE)
   # Ensure the provided Python interpreter is used
