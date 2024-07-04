@@ -22,7 +22,7 @@ namespace polystar::polygon {
     using edge_t = std::pair<ind_t, ind_t>;
     using base_t = std::vector<ind_t>;
   private:
-    inline ind_t vi(size_t i) const { return operator[](i); }
+    inline ind_t vi(size_t i) const { return operator[](i % size()); }
     inline ind_t vj(size_t i) const { return operator[]((i + 1) % size()); }
 
   public:

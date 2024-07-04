@@ -10,6 +10,10 @@ FetchContent_MakeAvailable(Triangle)
 add_compile_definitions(Triangle PUBLIC NO_FILE_IO CDT_ONLY)
 
 foreach(TRI_TARGET IN LISTS CXX_TARGETS)
-    # message(STATUS "Adding HighFive library to ${HF_TARGET}")
-    target_link_libraries(${TRI_TARGET} PUBLIC Triangle::triangle-api)
+    # Triangle::triangle-api uses shared libraries, which can be problematic for delve-wheel to find
+    target_link_libraries(${TRI_TARGET} PRIVATE Triangle::triangle-api)
+#    # Triangle::triangle uses static libraries, which do not need to be found by delve-wheel
+#    target_link_libraries(${TRI_TARGET} PUBLIC Triangle::triangle)
+#    # but _do_ need to be specified more-accurately since they show up in the build directory under Triangle
+#    target_include_directories(${TRI_TARGET} PUBLIC "${Triangle_BINARY_DIR}/Triangle")
 endforeach()

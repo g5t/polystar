@@ -7,6 +7,7 @@ set(POLYSTAR_PYTHON_MODULE_SOURCES
   _bitmap.cpp
   _network.cpp
   _svg.cpp
+  _wire.cpp
 )
 target_sources(${POLYSTAR_PYTHON_MODULE} PRIVATE ${POLYSTAR_PYTHON_MODULE_SOURCES})
 
