@@ -34,7 +34,8 @@ jobs:
         variant:
           - {os: ubuntu-22.04, platform: 'manylinux'}
           - {os: ubuntu-22.04, platform: 'musllinux'}
-          - {os: macos-12, platform: 'macosx'}
+          - {os: macos-12, platform: 'macosx'}      # Intel support
+          - {os: macos-latest, platform: 'macosx'}  # Apple silicon support
         python-tag: ['cp38', 'cp39', 'cp310', 'cp311', 'cp312']
 
     steps:
