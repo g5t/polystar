@@ -1,7 +1,5 @@
 set(CURRENT_LIST_DIR ${CMAKE_CURRENT_LIST_DIR})
 
-find_package(Python3 QUIET COMPONENTS Interpreter)
-
 if (NOT DEFINED pre_configure_dir)
   set(pre_configure_dir ${CMAKE_SOURCE_DIR})
 endif()
@@ -20,6 +18,14 @@ endif()
 set(pre_configure_file ${pre_configure_dir}/version.hpp.in)
 set(post_configure_file ${post_configure_dir}/version.hpp)
 
+function (ensurePythonAvailable)
+  if (NOT DEFINED ${Python3_EXECUTABLE})
+    message(STATUS "Finding Python3 Executable")
+    find_package(Python3 QUIET COMPONENTS Interpreter)
+  endif()
+  message(STATUS "Using Python3 Executable ${Python3_EXECUTABLE}")
+endfunction()
+
 function (checkPythonModule module)
   execute_process(
           COMMAND ${Python3_EXECUTABLE} -c "import ${module}"
@@ -28,7 +34,7 @@ function (checkPythonModule module)
           ERROR_QUIET
   )
   if (${module_missing} GREATER 0)
-    message(STATUS "Installing Python module ${module} using pip for interpreter ${Python3_EXECUTABLE}")
+     message(STATUS "Installing Python module ${module} using pip for interpreter ${Python3_EXECUTABLE}")
     execute_process(
             COMMAND ${Python3_EXECUTABLE} -m pip install ${module}
             WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
@@ -54,6 +60,7 @@ function(checkGitRead git_hash)
 endfunction()
 
 function(checkGitVersion git_version safe_version)
+#  message(STATUS "Gather version information with git and ${Python3_EXECUTABLE}")
   execute_process(
     COMMAND git rev-parse HEAD
     WORKING_DIRECTORY ${pre_configure_dir}
@@ -105,6 +112,7 @@ endfunction()
 
 function(checkGitSetup name)
   add_custom_target(AlwaysCheckGit COMMAND ${CMAKE_COMMAND}
+    -DPython3_EXECUTABLE=${Python3_EXECUTABLE}  # Ensure the top-level used Python is always used
     -DRUN_CHECK_GIT_VERSION=1
     -Dpre_configure_dir=${pre_configure_dir}
     -Dpost_configure_dir=${post_configure_dir}
