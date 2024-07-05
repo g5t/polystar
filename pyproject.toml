@@ -24,10 +24,11 @@ build-verbosity = 1
 skip = ["cp36-*", "cp37-*"]
 
 [tools.cibuildwheel.windows]
+skip = ["cp36-*", "cp37-*", "pp*"]  # skip cp* for speed; pp* because building numpy breaks(!?)
 before-build = "pip install delvewheel"
 repair-wheel-command = "delvewheel repair -w {dest_dir} -v {wheel}"
 
-#[[tool.cibuildwheel.overrides]]
-#select = "*-musllinux*"
-#before-test = "echo 'Override building numpy since no wheels are provided'"
-#test-command = "echo 'Override test command under musl libc until we can install a numpy wheel'"
+[[tool.cibuildwheel.overrides]]
+select = "*-musllinux*"
+before-test = "echo 'Override building numpy since no wheels are provided when using CIBuildWheel'"
+test-command = "echo 'Override test command under musl libc until we can install a numpy wheel'"
