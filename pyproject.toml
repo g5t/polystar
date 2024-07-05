@@ -19,18 +19,15 @@ before-test = "pip install numpy"
 build-verbosity = 1
 
 #[tool.cibuildwheel.linux]
-#before-all = "yum install -y hdf5-devel"
 
-#[tool.cibuildwheel.macos]
-#before-all = "brew install hdf5"
+[tool.cibuildwheel.macos]
+skip = ["cp36-*", "cp37-*"]
 
 [tools.cibuildwheel.windows]
-#before-all = "mamba install hdf5"
 before-build = "pip install delvewheel"
 repair-wheel-command = "delvewheel repair -w {dest_dir} -v {wheel}"
 
-[[tool.cibuildwheel.overrides]]
-select = "*-musllinux*"
-#before-all = "apk add hdf5-dev"
-before-test = "echo 'Override building numpy since no wheels are provided'"
-test-command = "echo 'Override test command under musl libc until we can install a numpy wheel'"
+#[[tool.cibuildwheel.overrides]]
+#select = "*-musllinux*"
+#before-test = "echo 'Override building numpy since no wheels are provided'"
+#test-command = "echo 'Override test command under musl libc until we can install a numpy wheel'"

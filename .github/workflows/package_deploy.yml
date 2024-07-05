@@ -64,8 +64,8 @@ jobs:
       fail-fast: false
       matrix:
         variant:
-          - { os: ubuntu-22.04, platform: 'manylinux' }
-          - { os: ubuntu-22.04, platform: 'musllinux' }
+          - { os: ubuntu-latest, platform: 'manylinux' }
+          - { os: ubuntu-latest, platform: 'musllinux' }
           - { os: macos-13, platform: 'macosx' }  # Intel support
           - { os: macos-14, platform: 'macosx' }  # Apple silicon support
 
@@ -73,6 +73,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # https://cibuildwheel.pypa.io/en/stable/faq/#macos-building-cpython-38-wheels-on-arm64
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.8
+        if: runner.os == 'macOS' && runner.arch == 'ARM64'
 
       - uses: pypa/cibuildwheel@v2.19.2
         env:
