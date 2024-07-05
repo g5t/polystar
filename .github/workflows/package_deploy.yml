@@ -25,37 +25,69 @@ jobs:
         name: dist
         path: dist/*.tar.gz
 
+#  cibuildwheel:
+#    name: "${{ matrix.python-tag }} ${{ matrix.variant.platform }} on ${{ matrix.variant.os }}"
+#    runs-on: ${{ matrix.variant.os }}
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        variant:
+#          - {os: ubuntu-22.04, platform: 'manylinux'}
+#          - {os: ubuntu-22.04, platform: 'musllinux'}
+#          - {os: macos-12, platform: 'macosx'}      # Intel support
+#          - {os: macos-latest, platform: 'macosx'}  # Apple silicon support
+#        python-tag: ['cp38', 'cp39', 'cp310', 'cp311', 'cp312']
+#
+#    steps:
+#    - uses: actions/checkout@v4
+#      with:
+#        fetch-depth: 0
+#
+#    - uses: pypa/cibuildwheel@v2.19.2
+#      env:
+#        CIBW_BUILD: ${{ matrix.python-tag }}-${{ matrix.variant.platform }}*
+#        MACOSX_DEPLOYMENT_TARGET: "11.0"
+#
+#    - name: Verify clean directory
+#      run: git diff --exit-code
+#      shell: bash
+#
+#    - uses: actions/upload-artifact@v4
+#      with:
+#        name: "${{ matrix.python-tag }}-${{ matrix.variant.platform }}-${{ matrix.variant.os }}"
+#        path: wheelhouse/*.whl
+
   cibuildwheel:
-    name: "${{ matrix.python-tag }} ${{ matrix.variant.platform }} on ${{ matrix.variant.os }}"
+    name: "Build wheels for ${{ matrix.variant.platform }} on ${{ matrix.variant.os }}"
     runs-on: ${{ matrix.variant.os }}
     strategy:
       fail-fast: false
       matrix:
         variant:
-          - {os: ubuntu-22.04, platform: 'manylinux'}
-          - {os: ubuntu-22.04, platform: 'musllinux'}
-          - {os: macos-12, platform: 'macosx'}      # Intel support
-          - {os: macos-latest, platform: 'macosx'}  # Apple silicon support
-        python-tag: ['cp38', 'cp39', 'cp310', 'cp311', 'cp312']
+          - { os: ubuntu-22.04, platform: 'manylinux' }
+          - { os: ubuntu-22.04, platform: 'musllinux' }
+          - { os: macos-13, platform: 'macosx' }  # Intel support
+          - { os: macos-14, platform: 'macosx' }  # Apple silicon support
 
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - uses: pypa/cibuildwheel@v2.19.2
-      env:
-        CIBW_BUILD: ${{ matrix.python-tag }}-${{ matrix.variant.platform }}*
-        MACOSX_DEPLOYMENT_TARGET: "11.0"
+      - uses: pypa/cibuildwheel@v2.19.2
+        env:
+          CIBW_BUILD: "*-${{ matrix.variant.platform }}*"
 
-    - name: Verify clean directory
-      run: git diff --exit-code
-      shell: bash
+      - name: Verify clean directory
+        run: git diff --exit-code
+        shell: bash
 
-    - uses: actions/upload-artifact@v4
-      with:
-        name: "${{ matrix.python-tag }}-${{ matrix.variant.platform }}-${{ matrix.variant.os }}"
-        path: wheelhouse/*.whl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: "cibw-wheels-${{ matrix.variant.platform }}-${{ matrix.variant.os }}"
+          path: wheelhouse/*.whl
+
+
 
   buildwheel:
     name: "${{ matrix.python-version }} ${{ matrix.variant.name }} on ${{ matrix.variant.os }}"
