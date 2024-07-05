@@ -172,9 +172,9 @@ namespace polystar::bitmap {
         }
         // vertical filter on the columns_written column
         if (horizontal.has_value()){
-          auto vertical = filter1d(comparer, std::min(line_read, M-1), line_write, horizontal.value(), top, bottom, M, queues[column_write]);
+          auto vertical = filter1d(comparer, std::min(line_read, M-1), line_write, *horizontal, top, bottom, M, queues[column_write]);
           if (vertical.has_value()) {
-            out.value(line_write, column_write) = vertical.value();
+            out.value(line_write, column_write) = *vertical;
             wrote_to_line = true;
           }
           column_write++;

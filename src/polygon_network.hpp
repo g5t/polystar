@@ -94,8 +94,8 @@ namespace polystar::polygon {
       auto graph = graph::Graph<double>(no_v+2); // no more than 2 + len(vertices_) nodes (probably exactly this)
       auto present = indexes();
       // remove the off-limits positions (if there are any)
-      if (off_limits_.has_value() && off_limits_.value().size()) {
-        const auto & ol{off_limits_.value()};
+      if (off_limits_.has_value() && off_limits_->size()) {
+        const auto & ol{*off_limits_};
         present.erase(std::remove_if(present.begin(), present.end(), [&](const auto &i) {
           return std::find(ol.begin(), ol.end(), i) != ol.end();}), present.end());
       }
@@ -108,8 +108,8 @@ namespace polystar::polygon {
         }
       }
       // add the from and to connections
-      const auto & fv{first.value()};
-      const auto & lv{last.value()};
+      const auto & fv{*first};
+      const auto & lv{*last};
       for (const auto & i: present) {
         if (std::find(fv->begin(), fv->end(), i) != fv->end()) {
           // we can only come *from* the source
@@ -163,8 +163,8 @@ namespace polystar::polygon {
         auto graph = graph::Graph<double>(no_v+1+destinations.size());
         auto present = indexes();
         // remove the off-limits positions (if there are any)
-        if (off_limits_.has_value() && off_limits_.value().size()) {
-          const auto & ol{off_limits_.value()};
+        if (off_limits_.has_value() && off_limits_->size()) {
+          const auto & ol{*off_limits_};
           present.erase(std::remove_if(present.begin(), present.end(), [&](const auto &i) {
             return std::find(ol.begin(), ol.end(), i) != ol.end();}), present.end());
         }
@@ -177,7 +177,7 @@ namespace polystar::polygon {
         }
         // add the from and to connections
         std::vector<size_t> extra_indexes(1+destinations.size(), no_v);
-        const auto & fv{first.value()};
+        const auto & fv{*first};
         for (const auto & i: present) {
             if (std::find(fv->begin(), fv->end(), i) != fv->end()) {
                 // we can only come *from* the source
@@ -188,7 +188,7 @@ namespace polystar::polygon {
         for (const auto & last: destinations) {
           extra_indexes[1+destination_count] = no_v + 1 + destination_count;
           if (last.has_value()) {
-            const auto &lv{last.value()};
+            const auto &lv{*last};
             for (const auto &i: present) {
               if (std::find(lv->begin(), lv->end(), i) != lv->end()) {
                 // we only go *towards* the sink(s)

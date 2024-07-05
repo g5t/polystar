@@ -65,10 +65,7 @@ namespace polystar::polygon {
 
     Wires(const Wires &that) = default;
 
-    Wires(Wires &&that)
-
-    noexcept: border_(std::move(that.border_)), wires_(std::move(that
-    .wires_)) {}
+    Wires(Wires &&that) noexcept: border_(std::move(that.border_)), wires_(std::move(that.wires_)) {}
 
     Wires &operator=(const Wires &that) = default;
 
@@ -76,9 +73,14 @@ namespace polystar::polygon {
       if (border_ != that.border()) return true;
       auto ow = that.wires();
       if (wires_.has_value()) {
-        if (ow.size() != wires_.value().size()) return true;
+        if (ow.size() != wires_->size()) return true;
+        /* wires_.value().size() is unavailable for some macOS variants
+         * We've already checked that wires_ has a value, so we can safely
+         * use pointer dereferencing to access that value.
+         * https://stackoverflow.com/questions/44217316/how-do-i-use-stdoptional-in-c
+         * */
         size_t count{0};
-        for (const auto &w: wires_.value()) {
+        for (const auto &w: *wires_){
           if (std::find_if(ow.begin(), ow.end(), [&](const auto &x) { return x == w; }) != ow.end()) count++;
         }
         return ow.size() != count;
@@ -94,8 +96,8 @@ namespace polystar::polygon {
       auto border = border_.replace(permutation);
       if (wires_.has_value()) {
         proto_t wires;
-        wires.reserve(wires_.value().size());
-        for (const auto &wire: wires_.value()) wires.push_back(wire.replace(permutation));
+        wires.reserve(wires_->size());
+        for (const auto &wire: *wires_) wires.push_back(wire.replace(permutation));
         return Wires(border, wires);
       }
       return Wires(border);
@@ -118,8 +120,9 @@ namespace polystar::polygon {
          4. If there are any remaining wires, clear the failed-edge list and go back to 1.
       */
       auto b = border_;
-      auto ws = wires_.value();
-      size_t failures{0u};
+      auto ws = *wires_;
+//      size_t failures{0u};
+      decltype(ws)::difference_type failures{0u};
 
       using p_t = typename wire_t::edge_t;
       using pp_t = std::pair<p_t, p_t>;
@@ -185,7 +188,7 @@ namespace polystar::polygon {
           // reset the failures counter
           failures = 0u;
         }
-        if (failures >= ws.size()) {
+        if (static_cast<size_t>(failures) >= ws.size()) { // failures is always positive, so hopefully this is ok
           // relax the repeated border point restriction (this makes triangulation harder)
           max_counts++;
           // start again from the front of the wires list
@@ -211,7 +214,7 @@ namespace polystar::polygon {
     template<class T, template<class> class A>
       bool intersects(const A<T>& other, const typename wire_t::edge_t edge, const A<T> & ours, end_type inclusive = end_type::both) const {
       if (border_.intersects(other, edge, ours, inclusive)) return true;
-      if (wires_.has_value()) for (const auto & w: wires_.value()) if (w.intersects(other, edge, ours, inclusive)) return true;
+      if (wires_.has_value()) for (const auto & w: *wires_) if (w.intersects(other, edge, ours, inclusive)) return true;
       // no intersection ... but the edge could be *inside* the border (... and not inside a hole) -- push this to another function
       return false;
     }
@@ -221,22 +224,22 @@ namespace polystar::polygon {
 
     [[nodiscard]] wire_t border() const { return border_; }
 
-    [[nodiscard]] size_t wire_count() const { return wires_.has_value() ? wires_.value().size() : 0; }
+    [[nodiscard]] size_t wire_count() const { return wires_.has_value() ? wires_->size() : 0; }
 
-    [[nodiscard]] proto_t wires() const { return wires_.has_value() ? wires_.value() : proto_t(); }
+    [[nodiscard]] proto_t wires() const { return wires_.has_value() ? *wires_ : proto_t(); }
 
     [[nodiscard]] wire_t wire(const ind_t &i) const {
       assert(wires_.has_value());
       assert(i < wire_count());
-      return wires_.value()[i];
+      return (*wires_)[i];
     }
 
     // calculated property accessors
     [[nodiscard]] Wires mirror() const {
       auto b = border_.mirror();
       proto_t w;
-      w.reserve(wires_.has_value() ? wires_.value().size() : 0u);
-      if (wires_.has_value()) for (const auto &w_: wires_.value()) w.push_back(w_.mirror());
+      w.reserve(wires_.has_value() ? wires_->size() : 0u);
+      if (wires_.has_value()) for (const auto &w_: *wires_) w.push_back(w_.mirror());
       return wires_.has_value() ? Wires(b, w) : Wires(b);
     }
 
@@ -249,7 +252,7 @@ namespace polystar::polygon {
       auto not_in_all = [&all](const auto &i) { return std::find(all.begin(), all.end(), i) == all.end(); };
       for (const auto &x: border_) if (not_in_all(x)) all.push_back(x);
       if (wires_.has_value())
-        for (const auto &wire: wires_.value())
+        for (const auto &wire: *wires_)
           for (const auto &x: wire)
             if (not_in_all(x))
               all.push_back(x);
@@ -287,14 +290,14 @@ namespace polystar::polygon {
     [[nodiscard]] T area(const A<T> &x) const {
       auto result = border_.area(x);
       // result should be positive, and any wires should be holes which reduce the area
-      if (wires_.has_value()) for (const auto &w: wires_.value()) result += w.area(x);
+      if (wires_.has_value()) for (const auto &w: *wires_) result += w.area(x);
       return result;
     }
 
     template<class T, template<class> class A, class U = typename A<T>::shape_t>
     [[nodiscard]] A<T> centroid(const A<T> &x) const {
       auto result = border_.centroid(x);
-      if (wires_.has_value()) for (const auto &w: wires_.value()) result += w.centroid(x);
+      if (wires_.has_value()) for (const auto &w: *wires_) result += w.centroid(x);
       return result;
     }
 
@@ -306,14 +309,14 @@ namespace polystar::polygon {
 
     Wires combine(const Wires &that, const ind_t offset) const {
       auto b = border_.combine(that.border(), offset);
-      auto w = wires_.has_value() ? wires_.value() : proto_t();
+      auto w = wires_.has_value() ? *wires_ : proto_t();
       w.reserve(w.size() + that.wire_count());
       if (that.wire_count()) for (const auto &tw: that.wires()) w.push_back(tw.offset(offset));
       return w.empty() ? Wires(b) : Wires(b, w);
     }
 
     Wires insert_wire(const wire_t & w) const {
-      auto ws = wires_.has_value() ? wires_.value() : proto_t();
+      auto ws = wires_.has_value() ? *wires_ : proto_t();
       ws.push_back(w);
       return Wires(border_, ws);
     }
@@ -349,23 +352,23 @@ namespace polystar::polygon {
       template<class> class B>
     bool none_beyond(const A<T> &x, const B<R> &a, const B<R> &b) const {
       if (border_.any_beyond(x, a, b)) return false;
-      if (wires_.has_value()) for (const auto &w: wires_.value()) if (w.any_beyond(x, a, b)) return false;
+      if (wires_.has_value()) for (const auto &w: *wires_) if (w.any_beyond(x, a, b)) return false;
       return true;
     }
 
-    std::string python_string() const {
+    [[nodiscard]] std::string python_string() const {
       std::stringstream s;
       s << border_.python_string();
       s << ",[";
       size_t count{0};
       if (wires_.has_value())
-        for (const auto &w: wires_.value())
-          s << w.python_string() << (++count < wires_.value().size() ? "," : "");
+        for (const auto &w: *wires_)
+          s << w.python_string() << (++count < wires_->size() ? "," : "");
       s << "]";
       return s.str();
     }
 
-    friend std::ostream &operator<<(std::ostream &os, Wires w) {
+    friend std::ostream &operator<<(std::ostream &os, const Wires& w) {
       os << w.python_string();
       return os;
     }
@@ -397,7 +400,7 @@ namespace polystar::polygon {
           if (intersect2d(segment, se, x, border_.edge(i), inclusive))
             ++crossings;
         if (wires_.has_value())
-          for (const auto &w: wires_.value())
+          for (const auto &w: *wires_)
             for (size_t i = 0; i < w.size(); ++i) if (intersect2d(segment, se, x, w.edge(i), inclusive)) ++crossings;
         out.push_back((crossings % 2u) == 1u);
       }
@@ -411,7 +414,7 @@ namespace polystar::polygon {
       const auto p0{other.view(edge.first)};
       const auto p1{other.view(edge.second)};
       if (!border_.contains(p0, ours, inclusive) && !border_.contains(p1, ours, inclusive)) return false;
-      if (wires_.has_value()) for (const auto & w: wires_.value())
+      if (wires_.has_value()) for (const auto & w: *wires_)
         if (w.contains(p0, ours, inclusive) && w.contains(p1, ours, inclusive)) return false;
       return true;
     }
@@ -424,7 +427,7 @@ namespace polystar::polygon {
     template<class T, template<class> class A>
     void add_to_svg(SVG::Path & path, const A<T>& x) const {
       border_.add_to_svg(path, x);
-      if (wires_.has_value()) for (const auto & w: wires_.value()) w.add_to_svg(path, x);
+      if (wires_.has_value()) for (const auto & w: *wires_) w.add_to_svg(path, x);
     }
 
 
@@ -435,7 +438,7 @@ namespace polystar::polygon {
       bool ok{true};
       ok &= list_to_hdf<ind_t>(border_, group, "border");
       std::vector<std::vector<ind_t>> copied_wires; // not great, but vector<Wire> can´t be figured-out by the compiler
-      if (wires_.has_value()) for (const auto & w: wires_.value()) copied_wires.push_back(w);
+      if (wires_.has_value()) for (const auto & w: *wires_) copied_wires.push_back(w);
       ok &= lists_to_hdf(copied_wires, group, "wires");
       return ok;
     }

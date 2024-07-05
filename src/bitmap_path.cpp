@@ -147,9 +147,9 @@ int area{0};
 //auto visited = Array2<bool>(input.size(0), input.size(1), false);
 do {
   // take a step
-  vertices.push_back(vertices.back() + directions[dir.value()]);
+  vertices.push_back(vertices.back() + directions[*dir]);
   // add to the area
-  area += directions[dir.value()].coord()[0] * vertices.back().coord()[1];
+  area += directions[*dir].coord()[0] * vertices.back().coord()[1];
   // check for a newly-closed loop and fill in the enclosed area with its opposite color
   if (vertices.size() > 4) { // we need 5 vertices to enclose *1* pixel
   auto ptr = std::find(vertices.begin(), vertices.end() - 1, vertices.back());
@@ -157,7 +157,7 @@ do {
     input = flip_inside(input, ptr, vertices.end());
     }
   }
-  dir = next_direction(vertices.back(), dir.value());
+  dir = next_direction(vertices.back(), *dir);
 } while (dir.has_value() && start != vertices.back());
 
 return std::make_tuple(area, vertices);
