@@ -419,7 +419,7 @@ namespace SVG {
             std::map<std::string, SelectorProperties> keyframes; /**< CSS animations */
 
         protected:
-            std::string svg_to_string(const size_t) override;
+            std::string svg_to_string(size_t) override;
             std::string tag() override { return "style"; };
         };
 
@@ -768,8 +768,8 @@ namespace SVG {
         /** Like other autoscale() but accepts margin as a percentage */
         Element::BoundingBox bbox = this->get_bbox();
         this->get_bbox(bbox);
-        double width = abs(bbox.x1) + abs(bbox.x2),
-            height = abs(bbox.y1) + abs(bbox.y2);
+        double width = std::abs(bbox.x1) + std::abs(bbox.x2),
+            height = std::abs(bbox.y1) + std::abs(bbox.y2);
 
         this->autoscale({
             width * margin, width * margin,
@@ -787,8 +787,8 @@ namespace SVG {
 
         Element::BoundingBox bbox = this->get_bbox();
         this->get_bbox(bbox); // Compute the bounding box (recursive)
-        double width = abs(bbox.x1) + abs(bbox.x2) + margins.x1 + margins.x2,
-            height = abs(bbox.y1) + abs(bbox.y2) + margins.y1 + margins.y2,
+        double width = std::abs(bbox.x1) + std::abs(bbox.x2) + margins.x1 + margins.x2,
+            height = std::abs(bbox.y1) + std::abs(bbox.y2) + margins.y1 + margins.y2,
             x1 = bbox.x1 - margins.x1, y1 = bbox.y1 - margins.y1;
 
         this->set_attr("width", width)
@@ -833,7 +833,7 @@ namespace SVG {
         }
 
         return ret;
-    };
+    }
 
     inline SVG merge(SVG& left, SVG& right, const Margins& margins) {
         /** Merge two SVG documents together horizontally with a uniform margin */
