@@ -20,7 +20,7 @@ jobs:
         fetch-depth: 0
     - run: pipx run build --sdist
     - run: pipx run twine check dist/*
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: dist
         path: dist/*.tar.gz
@@ -46,7 +46,7 @@ jobs:
     - uses: pypa/cibuildwheel@v2.19.2
       env:
         CIBW_BUILD: ${{ matrix.python-tag }}-${{ matrix.variant.platform }}*
-        MACOSX_DEPLOYMENT_TARGET: "10.15"
+        MACOSX_DEPLOYMENT_TARGET: "11.0"
 
     - name: Verify clean directory
       run: git diff --exit-code
@@ -54,7 +54,7 @@ jobs:
 
     - uses: actions/upload-artifact@v4
       with:
-        name: "${{ matrix.python-tag }}-${{ matrix.variant.platform }}"
+        name: "${{ matrix.python-tag }}-${{ matrix.variant.platform }}-${{ matrix.variant.os }}"
         path: wheelhouse/*.whl
 
   buildwheel:
