@@ -64,10 +64,11 @@ jobs:
       fail-fast: false
       matrix:
         variant:
-          - { os: ubuntu-latest, platform: 'manylinux' }
-          - { os: ubuntu-latest, platform: 'musllinux' }
+          - { os: ubuntu-22.04, platform: 'manylinux' }
+          - { os: ubuntu-22.04, platform: 'musllinux' }
           - { os: macos-13, platform: 'macosx' }  # Intel support
           - { os: macos-14, platform: 'macosx' }  # Apple silicon support
+          - { os: windows-2022, platform: "windows" }
 
     steps:
       - uses: actions/checkout@v4
@@ -93,29 +94,29 @@ jobs:
           name: "cibw-wheels-${{ matrix.variant.platform }}-${{ matrix.variant.os }}"
           path: wheelhouse/*.whl
 
-
-
-  buildwheel:
-    name: "${{ matrix.python-version }} ${{ matrix.variant.name }} on ${{ matrix.variant.os }}"
-    runs-on: ${{ matrix.variant.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        variant:
-          - {os: windows-2022, name: "windows", config: "gha-test-windows"}
-        python-version: [ '3.8', '3.9', '3.10', '3.11', '3.12']
-    steps:
-      - uses: brille/python-hdf5-buildwheel-action@v2.3
-        with:
-          os: ${{ matrix.variant.os }}
-          python-version: ${{ matrix.python-version }}
-          arch: auto64
-          environment-file: .github/config/${{ matrix.variant.config }}.yml
-          environment-name: ${{ matrix.variant.name }}
+#
+#
+#  buildwheel:
+#    name: "${{ matrix.python-version }} ${{ matrix.variant.name }} on ${{ matrix.variant.os }}"
+#    runs-on: ${{ matrix.variant.os }}
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        variant:
+#          - {os: windows-2022, name: "windows", config: "gha-test-windows"}
+#        python-version: [ '3.8', '3.9', '3.10', '3.11', '3.12']
+#    steps:
+#      - uses: brille/python-hdf5-buildwheel-action@v2.3
+#        with:
+#          os: ${{ matrix.variant.os }}
+#          python-version: ${{ matrix.python-version }}
+#          arch: auto64
+#          environment-file: .github/config/${{ matrix.variant.config }}.yml
+#          environment-name: ${{ matrix.variant.name }}
 
   draft:
     name: Deploy packages
-    needs: [source, cibuildwheel, buildwheel]
+    needs: [source, cibuildwheel] # needs: [source, cibuildwheel, buildwheel]
     runs-on: ubuntu-22.04
     if: github.event_name == 'release'
 

@@ -19,13 +19,11 @@ jobs:
       fail-fast: false
       matrix:
         variant:
-          - {os: ubuntu-22.04, cmake-preset: gha-test-ubuntu }
-          - {os: ubuntu-latest, cmake-preset: gha-test-ubuntu }
+          - {os: ubuntu-22.04, cmake-preset: gha-test-ubuntu } # current Ubuntu latest
           - {os: macos-12, cmake-preset: gha-test-macos }
           - {os: macos-13, cmake-preset: gha-test-macos }
           - {os: macos-14, cmake-preset: gha-test-macos }
-          - {os: windows-2022, cmake-preset: gha-test-windows }
-          - {os: windows-latest, cmake-preset: gha-test-windows }
+          - {os: windows-2022, cmake-preset: gha-test-windows } # current Windows latest
         python-version: ["3.10"]
         cmake-type: ['Release']
 
