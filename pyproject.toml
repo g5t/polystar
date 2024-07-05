@@ -23,7 +23,7 @@ build-verbosity = 1
 [tool.cibuildwheel.macos]
 skip = ["cp36-*", "cp37-*"]
 
-[tools.cibuildwheel.windows]
+[tool.cibuildwheel.windows]
 skip = ["cp36-*", "cp37-*", "pp*"]  # skip cp* for speed; pp* because building numpy breaks(!?)
 before-build = "pip install delvewheel"
 repair-wheel-command = "delvewheel repair -w {dest_dir} -v {wheel}"
