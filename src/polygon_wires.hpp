@@ -132,7 +132,7 @@ namespace polystar::polygon {
       for (const auto & x: b) border_counts[x]++;
       size_t max_counts{2};
       // allow for the maximum connections at one point to be increased if we otherwise fail
-      while (failures < ws.size() && max_counts < 10u){
+      while (static_cast<size_t>(failures) < ws.size() && max_counts < 10u){
         std::cout << "border counts: ";
         for (const auto & bc: border_counts) std::cout << bc << " ";
         std::cout << "\n";
@@ -307,7 +307,7 @@ namespace polystar::polygon {
       return border_.circumscribed_radius(x);
     }
 
-    Wires combine(const Wires &that, const ind_t offset) const {
+    [[nodiscard]] Wires combine(const Wires &that, const ind_t offset) const {
       auto b = border_.combine(that.border(), offset);
       auto w = wires_.has_value() ? *wires_ : proto_t();
       w.reserve(w.size() + that.wire_count());
@@ -315,7 +315,7 @@ namespace polystar::polygon {
       return w.empty() ? Wires(b) : Wires(b, w);
     }
 
-    Wires insert_wire(const wire_t & w) const {
+    [[nodiscard]] Wires insert_wire(const wire_t & w) const {
       auto ws = wires_.has_value() ? *wires_ : proto_t();
       ws.push_back(w);
       return Wires(border_, ws);
