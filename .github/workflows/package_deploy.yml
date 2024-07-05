@@ -6,6 +6,10 @@ on:
     types: [created, edited, published]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event.action == 'published' }}
+
 defaults:
   run:
     shell: bash -l {0}
@@ -85,7 +89,6 @@ jobs:
       with:
         allowUpdates: true
         draft: ${{ github.event.action != 'published' }}
-        prerelease: true
         token: ${{ secrets.GITHUB_TOKEN }}
         artifacts: "dist/*.whl,dist/*.tar.gz"
     - name: Publish artifacts to PyPI

@@ -21,7 +21,7 @@ build-verbosity = 1
 #[tool.cibuildwheel.linux]
 
 [tool.cibuildwheel.macos]
-skip = ["cp36-*", "cp37-*"]
+skip = ["cp36-*", "cp37-*", "pp*"]  # all skipped for speed only
 
 [tool.cibuildwheel.windows]
 skip = ["cp36-*", "cp37-*", "pp*"]  # skip cp* for speed; pp* because building numpy breaks(!?)
