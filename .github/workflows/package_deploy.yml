@@ -73,6 +73,7 @@ jobs:
     if: github.event_name == 'release'
     permissions:
       id-token: write
+      contents: write
     environment: release
 
     steps:
@@ -84,12 +85,12 @@ jobs:
       run: |
         mkdir dist
         find ${{ steps.download.outputs.download-path }} -type f -regex ".*\.\(tar\.gz\|whl\)" -exec mv {} dist/. \;
+        ls dist/
     - name: Attach artifacts to GitHub tagged draft release
       uses: ncipollo/release-action@v1
       with:
         allowUpdates: true
         draft: ${{ github.event.action != 'published' }}
-        token: ${{ secrets.GITHUB_TOKEN }}
         artifacts: "dist/*.whl,dist/*.tar.gz"
     - name: Publish artifacts to PyPI
       if: ${{ github.event.action == 'published' }}
