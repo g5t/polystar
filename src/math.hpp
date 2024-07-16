@@ -1,6 +1,7 @@
 #ifndef POLYSTAR_MATH_HPP
 #define POLYSTAR_MATH_HPP
 
+#include <tuple>
 #include <cmath>
 
 namespace polystar::math{
