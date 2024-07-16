@@ -45,3 +45,16 @@ from .bound import (
     __bitmap_types__,
     __network_types__,
 )
+
+__all__ = [
+    "Polyhedron",
+    "Polygon",
+    "CoordinatePolygon",
+    "BitmapI",
+    "BitmapF",
+    "BitmapD",
+    "Network",
+    "CoordinateNetwork",
+    "SVG",
+    "animated_svg",
+]

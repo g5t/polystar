@@ -1,14 +1,51 @@
 [build-system]
-# Minimum requirements for the build system to execute.
 requires =[
-  "setuptools>=45",
-  "setuptools_scm[toml]>=6.2",
+  "setuptools>=64",
+  "setuptools_scm>=8",
   "wheel",
   "cmake>=3.24",
-#  "numpy==1.13.3; python_version<'3.5'",
-#  "oldest-supported-numpy; python_version>='3.5'",
-  "conan==2.4.1",
+  "conan>=2.4.1",
 ]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = 'polystar'
+dynamic = ["version"]
+authors = [{name = "Gregory Tucker", email="gregory.tucker@ess.eu"}]
+maintainers = [{name = "Gregory Tucker", email = "gregory.tucker@ess.eu"}]
+description = "Polygon and polyhedron operations"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+  "Operating System :: Microsoft :: Windows :: Windows 10",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS :: MacOS X",
+  "Programming Language :: C++",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+dependencies = ["numpy"]
+
+[project.optional-dependencies]
+plotting = ["matplotlib>=2.2.0"]
+vis = ["pyglet>=1.5.27", "vispy>=0.12.1"]
+
+[project.urls]
+Homepage = "https://github.com/g5t/polystar"
+Repository = "https://github.com/g5t/polystar.git"
+Issues = "https://github.com/g5t/polystar/issues"
+
+[tool.setuptools.packages.find]
+include= ["polystar*"]
+namespaces = false
 
 [tool.setuptools_scm]
 
@@ -17,18 +54,6 @@ archs = ["auto64"]
 test-command = "python -m unittest discover -s {package}/wrap/tests"
 before-test = "pip install numpy"
 build-verbosity = 1
+skip = ["cp36-*", "cp37-*", "pp*"]
+test-skip = "cp38-musllinux*"
 
-#[tool.cibuildwheel.linux]
-
-[tool.cibuildwheel.macos]
-skip = ["cp36-*", "cp37-*", "pp*"]  # all skipped for speed only
-
-[tool.cibuildwheel.windows]
-skip = ["cp36-*", "cp37-*", "pp*"]  # skip cp* for speed; pp* because building numpy breaks(!?)
-before-build = "pip install delvewheel"
-repair-wheel-command = "delvewheel repair -w {dest_dir} -v {wheel}"
-
-[[tool.cibuildwheel.overrides]]
-select = "*-musllinux*"
-before-test = "echo 'Override building numpy since no wheels are provided when using CIBuildWheel'"
-test-command = "echo 'Override test command under musl libc until we can install a numpy wheel'"

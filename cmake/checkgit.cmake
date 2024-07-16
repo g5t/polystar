@@ -1,5 +1,7 @@
 set(CURRENT_LIST_DIR ${CMAKE_CURRENT_LIST_DIR})
 
+find_package(Python3 QUIET COMPONENTS Interpreter)
+
 if (NOT DEFINED pre_configure_dir)
   set(pre_configure_dir ${CMAKE_SOURCE_DIR})
 endif()
@@ -18,25 +20,17 @@ endif()
 set(pre_configure_file ${pre_configure_dir}/version.hpp.in)
 set(post_configure_file ${post_configure_dir}/version.hpp)
 
-function (ensurePythonAvailable)
-  if (NOT DEFINED ${Python3_EXECUTABLE})
-    message(STATUS "Finding Python3 Executable")
-    find_package(Python3 QUIET COMPONENTS Interpreter)
-  endif()
-  message(STATUS "Using Python3 Executable ${Python3_EXECUTABLE}")
-endfunction()
-
 function (checkPythonModule module)
   execute_process(
-          COMMAND ${Python3_EXECUTABLE} -c "import ${module}"
+          COMMAND ${Python_EXECUTABLE} -c "import ${module}"
           WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
           RESULT_VARIABLE module_missing
           ERROR_QUIET
   )
   if (${module_missing} GREATER 0)
-     message(STATUS "Installing Python module ${module} using pip for interpreter ${Python3_EXECUTABLE}")
+    message(STATUS "Installing Python module ${module} using pip for interpreter ${Python_EXECUTABLE}")
     execute_process(
-            COMMAND ${Python3_EXECUTABLE} -m pip install ${module}
+            COMMAND ${Python_EXECUTABLE} -m pip install ${module}
             WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
             RESULT_VARIABLE pip_failed
             OUTPUT_QUIET
@@ -60,7 +54,6 @@ function(checkGitRead git_hash)
 endfunction()
 
 function(checkGitVersion git_version safe_version)
-#  message(STATUS "Gather version information with git and ${Python3_EXECUTABLE}")
   execute_process(
     COMMAND git rev-parse HEAD
     WORKING_DIRECTORY ${pre_configure_dir}
@@ -74,24 +67,24 @@ function(checkGitVersion git_version safe_version)
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
   execute_process(
-    COMMAND ${Python3_EXECUTABLE} -c "from datetime import datetime; print(datetime.now().isoformat(timespec='minutes'))"
+    COMMAND ${Python_EXECUTABLE} -c "from datetime import datetime; print(datetime.now().isoformat(timespec='minutes'))"
     OUTPUT_VARIABLE GIT_CONFIGURE_TIME
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
   execute_process(
-    COMMAND ${Python3_EXECUTABLE} -c "import setuptools_scm as s; print(s.get_version())"
+    COMMAND ${Python_EXECUTABLE} -c "import setuptools_scm as s; print(s.get_version())"
     WORKING_DIRECTORY ${pre_configure_dir}
     OUTPUT_VARIABLE GIT_VERSION
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
   execute_process(
-    COMMAND ${Python3_EXECUTABLE} -c "import setuptools_scm as s; print('.'.join(s.get_version().split('.')[:3]))"
+    COMMAND ${Python_EXECUTABLE} -c "import setuptools_scm as s; print('.'.join(s.get_version().split('.')[:3]))"
     WORKING_DIRECTORY ${pre_configure_dir}
     OUTPUT_VARIABLE GIT_SAFE_VERSION
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
   execute_process(
-    COMMAND ${Python3_EXECUTABLE} -c "import platform; print(platform.node())"
+    COMMAND ${Python_EXECUTABLE} -c "import platform; print(platform.node())"
     OUTPUT_VARIABLE GIT_HOSTNAME
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
@@ -112,7 +105,7 @@ endfunction()
 
 function(checkGitSetup name)
   add_custom_target(AlwaysCheckGit COMMAND ${CMAKE_COMMAND}
-    -DPython3_EXECUTABLE=${Python3_EXECUTABLE}  # Ensure the top-level used Python is always used
+    -DPython_EXECUTABLE=${Python_EXECUTABLE}
     -DRUN_CHECK_GIT_VERSION=1
     -Dpre_configure_dir=${pre_configure_dir}
     -Dpost_configure_dir=${post_configure_dir}

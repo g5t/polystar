@@ -1,4 +1,5 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+
 #include "subscript.hpp"
 #include "utilities.hpp"
 
@@ -201,7 +202,7 @@ TEST_CASE("Fixed-index Array2 iterator", "[subscript2]"){
 
 TEST_CASE("Auto Array2 broadcasting","[subscript2]"){
   using namespace polystar;
-  std::array<int,2> a({3,4}), b;
+  std::array<int,2> a({3,4}), b{};
   std::vector<std::vector<int>>
     o_expected{{0,0},{0,1},{0,2},{0,3},{1,0},{1,1},{1,2},{1,3},{2,0},{2,1},{2,2},{2,3}},
     b_expected;

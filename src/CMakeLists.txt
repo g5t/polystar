@@ -60,11 +60,8 @@ list(APPEND CXX_SOURCES
   bitmap_show.cpp
   polygon_wire.cpp
   polygon_wires.cpp
+  hdf_interface.cpp
 )
-
-if(POLYSTAR_HDF5)
-    list(APPEND CXX_SOURCES hdf_interface.cpp)
-endif()
 
 foreach(CXX_SOURCE IN LISTS CXX_SOURCES)
 #    message(STATUS "Setting compile options for ${CXX_SOURCE} to ${SOURCE_FILE_COMPILE_OPTIONS}")

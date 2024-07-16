@@ -30,45 +30,44 @@ jobs:
         path: dist/*.tar.gz
 
   cibuildwheel:
-    name: "Build wheels for ${{ matrix.variant.platform }} on ${{ matrix.variant.os }}"
+    name: "${{ matrix.variant.platform }} on ${{ matrix.variant.os }}"
     runs-on: ${{ matrix.variant.os }}
     strategy:
       fail-fast: false
       matrix:
         variant:
-          - { os: ubuntu-22.04, platform: 'manylinux' }
-          - { os: ubuntu-22.04, platform: 'musllinux' }
-          - { os: macos-13, platform: 'macosx' }  # Intel support
-          - { os: macos-14, platform: 'macosx' }  # Apple silicon support
-          - { os: windows-2022, platform: "win" }
+          - {os: ubuntu-22.04, platform: 'manylinux'}
+          - {os: ubuntu-22.04, platform: 'musllinux'}
+          - {os: macos-13, platform: 'macosx'}      # Intel support
+          - {os: macos-latest, platform: 'macosx'}  # Apple silicon support
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
-      # https://cibuildwheel.pypa.io/en/stable/faq/#macos-building-cpython-38-wheels-on-arm64
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.8
-        if: runner.os == 'macOS' && runner.arch == 'ARM64'
+    - uses: actions/setup-python@v5
+      with:
+        python-version: 3.8
+      if: runner.os == 'macOS' && runner.arch == 'ARM64'
 
-      - uses: pypa/cibuildwheel@v2.19.2
-        env:
-          CIBW_BUILD: "*-${{ matrix.variant.platform }}*"
+    - uses: pypa/cibuildwheel@v2.19.2
+      env:
+        CIBW_BUILD: "*-${{ matrix.variant.platform }}*"
+        MACOSX_DEPLOYMENT_TARGET: "10.15"
 
-      - name: Verify clean directory
-        run: git diff --exit-code
-        shell: bash
+    - name: Verify clean directory
+      run: git diff --exit-code
+      shell: bash
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: "cibw-wheels-${{ matrix.variant.platform }}-${{ matrix.variant.os }}"
-          path: wheelhouse/*.whl
+    - uses: actions/upload-artifact@v4
+      with:
+        name: "cibw-wheels-${{ matrix.variant.platform }}-${{ matrix.variant.os }}"
+        path: wheelhouse/*.whl
 
   draft:
     name: Deploy packages
-    needs: [source, cibuildwheel] # needs: [source, cibuildwheel, buildwheel]
+    needs: [source, cibuildwheel]
     runs-on: ubuntu-22.04
     if: github.event_name == 'release'
     permissions:
@@ -77,24 +76,23 @@ jobs:
     environment: release
 
     steps:
-    - uses: actions/download-artifact@v4
-      id: download
-      with:
-        path: artifacts
-    - name: Move artifacts into a single folder
-      run: |
-        mkdir dist
-        find ${{ steps.download.outputs.download-path }} -type f -regex ".*\.\(tar\.gz\|whl\)" -exec mv {} dist/. \;
-        ls dist/
-    - name: Attach artifacts to GitHub tagged draft release
-      uses: ncipollo/release-action@v1
-      with:
-        allowUpdates: true
-        draft: ${{ github.event.action != 'published' }}
-        artifacts: "dist/*.whl,dist/*.tar.gz"
-    - name: Publish artifacts to PyPI
-      if: ${{ github.event.action == 'published' }}
-      uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: actions/download-artifact@v4
+        id: download
+        with:
+          path: artifacts
+      - name: Move artifacts into a single folder
+        run: |
+          mkdir dist
+          find ${{ steps.download.outputs.download-path }} -type f -regex ".*\.\(tar\.gz\|whl\)" -exec mv {} dist/. \;
+      - name: Attach artifacts to GitHub tagged draft release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          draft: ${{ github.event.action != 'published' }}
+          artifacts: "dist/*.whl,dist/*.tar.gz"
+      - name: Publish artifacts to PyPI
+        if: ${{ github.event.action == 'published' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
 
 #  sphinx:
 #    runs-on: ubuntu-latest

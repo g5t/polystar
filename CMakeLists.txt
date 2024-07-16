@@ -18,7 +18,6 @@ SET(POLYSTAR_INCLUDE_DESTINATION include)
 set(TESTING_TARGET tester)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-# set(CMAKE_CXX_EXTENSIONS ON) # this causes conan_provider to set `gnu17` which doesn't exist for MSVC
 
 # Make the availability of testing optional
 option(POLYSTAR_BUILD_TESTING "Build tests for polystar" ON)
@@ -28,22 +27,10 @@ set(POLYSTAR_LOGLEVEL "INFO" CACHE STRING "Emit log messages to standard out (DE
 # Special option for profiling runs
 option(POLYSTAR_PROFILING "Emit profiling output to standard out" OFF)
 
-# Define the minimum version of libraries needed
-set(MINIMUM_PYBIND11_VERSION 2.10.3)
-set(FETCH_PYBIND11_REPO https://github.com/pybind/pybind11)
-set(MINIMUM_CATCH2_VERSION 2.13.9)
-set(FETCH_CATCH2_REPO https://github.com/catchorg/Catch2)
-
 # Optional support of HDF5-based IO
-option(POLYSTAR_HDF5 "Add HDF5 file-based IO" ON)
-option(REQUIRE_SYSTEM_HIGHFIVE "Never attempt to fetch HighFive" OFF)
-if (POLYSTAR_HDF5)
-    # Include the HDF5 IO methods -- safe since configuring will fail if HDF5/HighFive is not available
-    add_definitions(-DUSE_HIGHFIVE)
-endif()
-mark_as_advanced(REQUIRE_SYSTEM_HIGHFIVE)
-set(MINIMUM_HIGHFIVE_VERSION 2.6.2)
-SET(FETCH_HIGHFIVE_REPO https://github.com/BlueBrain/HighFive)
+# Include the HDF5 IO methods -- safe since configuring will fail if HDF5/HighFive is not available
+add_definitions(-DUSE_HIGHFIVE)
+
 
 # find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck)
 # if (CMAKE_CXX_CPPCHECK)
@@ -95,29 +82,19 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # With GCC 10+ the interproceedural optmization only adds to compilation time without improving performance
 SET(CMAKE_INTERPROCEDURAL_OPTIMIZATION FALSE)
 
+# Force pybind11 to use FindPython:
+set(PYBIND11_FINDPYTHON ON)
+# Ensure we can find/user the user-provided Python executable
 if (PYTHON_EXECUTABLE)
-  # Ensure the provided Python interpreter is used
-  set(Python3_EXECUTABLE ${PYTHON_EXECUTABLE})
+    set(Python_EXECUTABLE ${PYTHON_EXECUTABLE})
 endif()
-# With modern CMake, this find_package forces pybind11 to use FindPython instead of its custom tools
-find_package(Python3 COMPONENTS Interpreter Development)
-
+find_package(Python 3 COMPONENTS Interpreter Development)
 if (NOT DEFINED PYTHON_EXECUTABLE)
-  set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
+    set(PYTHON_EXECUTABLE ${Python_EXECUTABLE})
 endif()
 
-include(fetcher)
-
-# Attempt to find catch2 to handle C++ testing
-if(POLYSTAR_BUILD_TESTING)
-  git_fetch(catch2 ${MINIMUM_CATCH2_VERSION} ${FETCH_CATCH2_REPO})
-  list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/contrib")
-else()
-  # Since no testing is to be built, fake that we've found Catch2.
-  set(Catch2_FOUND ON)
-endif()
-# Attempt to find pybind11 to handle CPython bindings
-git_fetch(pybind11 ${MINIMUM_PYBIND11_VERSION} ${FETCH_PYBIND11_REPO})
+find_package(Catch2 REQUIRED)
+find_package(pybind11 REQUIRED)
 
 # Read the version of polystar
 include(checkgit)
@@ -128,7 +105,7 @@ message(STATUS "Build polystar v${POLYSTAR_VERSION} with type ${CMAKE_BUILD_TYPE
 if (NOT SKBUILD)
 # Create a single header by contatenating all headers in src/
 add_custom_target(single_header
-  COMMAND ${Python3_EXECUTABLE} acme.py ${POLYSTAR_SINGLE_HEADER} -o ${CMAKE_BINARY_DIR}
+  COMMAND ${Python_EXECUTABLE} acme.py ${POLYSTAR_SINGLE_HEADER} -o ${CMAKE_BINARY_DIR}
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
   DEPENDS git_version
 )
@@ -168,7 +145,7 @@ endforeach()
 
 if(POLYSTAR_BUILD_TESTING)
   message(STATUS "Build testing target '${TESTING_TARGET}' and configure CTest")
-  target_link_libraries(${TESTING_TARGET} PUBLIC Catch2::Catch2)
+  target_link_libraries(${TESTING_TARGET} PUBLIC Catch2::Catch2WithMain)
   include(CTest)
   include(Catch)
   catch_discover_tests(${TESTING_TARGET})
