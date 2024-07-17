@@ -520,6 +520,8 @@ public:
   const T* ptr(ind_t i0) const;
   const T* ptr(ind_t i0, ind_t j0) const;
   const T* ptr(const shape_t& partial_subscript) const;
+  const T* cptr(ind_t i0) const;
+
   T& val(ind_t i0);
   T& val(ind_t i0, ind_t j0);
   T& val(const shape_t& partial_subscript);

@@ -1249,10 +1249,13 @@ const T& Array2<T>::val(std::initializer_list<I> l) const {
 }
 
 template<class T>
+const T * Array2<T>::cptr(const ind_t i0) const {
+  // Ensure that _data is C-contiguous, possibly via a view, then return a pointer
+  return contiguous_row_ordered_copy(i0).ptr(0u);
+}
+template<class T>
 std::vector<T> Array2<T>::to_std(const ind_t i0) const {
-//  info_update("Extract index ", i0, " from ", to_string(), "expected ", to_string(i0));
   auto a0 = contiguous_row_ordered_copy(i0);
-//  info_update("produced ", a0.to_string());
   std::vector<T> out;
   out.reserve(a0.numel());
   for (auto x: a0.valItr()){

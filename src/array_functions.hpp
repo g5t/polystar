@@ -173,11 +173,11 @@ ARRAY_LATVEC_BINARY_OP(/)
     polystar::ind_t oO = (1u == aN) ? bN : aN;
     auto oarray = L<S>(oO, 3u); // row-ordered contiguous
     if (1u == aN){
-      for (polystar::ind_t j=0; j<bN; ++j) vector_cross<S,T,R,3>(oarray.ptr(j), a.to_std(0), b.to_std(j));
+      for (polystar::ind_t j=0; j<bN; ++j) vector_cross<S,T,R,3>(oarray.ptr(j), a.cptr(0), b.cptr(j));
     } else if (1u == bN) {
-      for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,3>(oarray.ptr(j), a.to_std(j), b.to_std(0));
+      for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,3>(oarray.ptr(j), a.cptr(j), b.cptr(0));
     } else {
-      for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,3>(oarray.ptr(j), a.to_std(j), b.to_std(j));
+      for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,3>(oarray.ptr(j), a.cptr(j), b.cptr(j));
     }
     return oarray;
   }
@@ -192,11 +192,11 @@ ARRAY_LATVEC_BINARY_OP(/)
     polystar::ind_t oO = (1u == aN) ? bN : aN;
     auto oarray = L<S>(oO, 1u); // row-ordered contiguous
     if (1u == aN) {
-      for (polystar::ind_t j=0; j<bN; ++j) vector_cross<S,T,R,2>(oarray.ptr(j), a.to_std(0), b.to_std(j));
+      for (polystar::ind_t j=0; j<bN; ++j) vector_cross<S,T,R,2>(oarray.ptr(j), a.cptr(0), b.cptr(j));
     } else if (1u == bN) {
-      for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,2>(oarray.ptr(j), a.to_std(j), b.to_std(0));
+      for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,2>(oarray.ptr(j), a.cptr(j), b.cptr(0));
     } else {
-      for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,2>(oarray.ptr(j), a.to_std(j), b.to_std(j));
+      for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,2>(oarray.ptr(j), a.cptr(j), b.cptr(j));
     }
     return oarray;
   }
@@ -242,15 +242,16 @@ dot(const A<T>& a, const A<R>& b) {
   assert( a.size(1) == b.size(1) );
   assert( a.is_row_ordered() && b.is_row_ordered() && a.is_contiguous() && b.is_contiguous() );
   polystar::ind_t aN=a.size(0), bN=b.size(0);
+  auto d = a.size(1);
   assert( 1u==aN || 1u==bN || aN==bN );
   polystar::ind_t oO = (1u == aN) ? bN : aN;
   auto oarray = A<S>(oO, 1u);
   if (1u==aN){
-    for (polystar::ind_t i=0; i<bN; ++i) oarray.val(i,0) = vector_dot<S,T,R>(a.to_std(0), b.to_std(i));
+    for (polystar::ind_t i=0; i<bN; ++i) oarray.val(i,0) = vector_dot<S,T,R>(d, a.cptr(0), b.cptr(i));
   } else if (1u==bN) {
-    for (polystar::ind_t i=0; i<aN; ++i) oarray.val(i,0) = vector_dot<S,T,R>(a.to_std(i), b.to_std(0));
+    for (polystar::ind_t i=0; i<aN; ++i) oarray.val(i,0) = vector_dot<S,T,R>(d, a.cptr(i), b.cptr(0));
   } else {
-    for (polystar::ind_t i=0; i<aN; ++i) oarray.val(i,0) = vector_dot<S,T,R>(a.to_std(i), b.to_std(i));
+    for (polystar::ind_t i=0; i<aN; ++i) oarray.val(i,0) = vector_dot<S,T,R>(d, a.cptr(i), b.cptr(i));
   }
   return oarray;
 }
@@ -259,7 +260,7 @@ template<class T, class R, class M, template<class> class A, class S=std::common
 std::enable_if_t<bothArrays<T,A,R,A>, S>
 same_lattice_dot(const A<R>& x, const A<T>& y, const std::array<M,9>& metric){
   std::array<S,3> tmp{0,0,0};
-  utils::mul_mat_vec(tmp.data(), metric.data(), x.to_std(0));
+  utils::mul_mat_vec(tmp.data(), metric.data(), x.cptr(0));
   S out{0};
   for (int i=0; i<3; ++i) out += tmp[i] * static_cast<S>(y[i]);
 //  verbose_update("metric x ", x.to_string(0), " = ", tmp , "; dot with ", y.to_string(0), " = ", out);
@@ -581,7 +582,7 @@ from_xyz_like(const A<T>& lv, const B<T>& b){
   B<S> coords(b.shape());
   auto x = b.shape();
   x.back() = 0u;
-  for (auto i: b.subItr(x)) utils::multiply_matrix_vector(coords.ptr(i), inv_xyz, b.to_std(i));
+  for (auto i: b.subItr(x)) utils::multiply_matrix_vector(coords.ptr(i), inv_xyz.data(), b.cptr(i));
   return A<S>(lv.type(), lat, coords);
 }
 
