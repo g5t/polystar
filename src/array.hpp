@@ -512,14 +512,14 @@ public:
   bool swap(ind_t i, ind_t a, ind_t b);
   std::vector<T> to_std() const;
   T* ptr();
-  T* ptr(const ind_t i0);
+  T* ptr(ind_t i0);
   template<class ... Subs, class=std::enable_if_t<polystar::utils::are_same<ind_t,Subs...>::value, void>>
-  T* ptr(const ind_t i0, Subs... subscripts);
+  T* ptr(ind_t i0, Subs... subscripts);
   T* ptr(const shape_t& partial_subscript);
   const T* ptr() const;
-  const T* ptr(const ind_t i0) const;
+  const T* ptr(ind_t i0) const;
   template<class ... Subs, class=std::enable_if_t<polystar::utils::are_same<ind_t,Subs...>::value, void>>
-  const T* ptr(const ind_t i0, Subs... subscripts) const;
+  const T* ptr(ind_t i0, Subs... subscripts) const;
   const T* ptr(const shape_t& partial_subscript) const;
   T& val(const ind_t i0);
   template<class ... Subs, class=std::enable_if_t<polystar::utils::are_same<ind_t,Subs...>::value, void>>
@@ -532,8 +532,12 @@ public:
   const T& val(const shape_t& partial_subscript) const;
   template<typename I> const T& val(std::initializer_list<I> l) const;
 
+  std::vector<T> to_std(ind_t i0) const;
+
   Array<T> contiguous_copy() const;
   Array<T> contiguous_row_ordered_copy() const;
+  //! Return the first-dimension Array with index i0
+  Array<T> contiguous_row_ordered_copy(ind_t i0) const;
   Array<T> squeeze() const;
   Array<T> squeeze(const ind_t dim) const;
   Array<T> slice(const ind_t i0) const;

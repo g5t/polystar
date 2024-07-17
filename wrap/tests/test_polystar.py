@@ -13,7 +13,7 @@ class PolystarTestCase(TestCase):
             import_module('polystar')
         except ModuleNotFoundError as exception:
             self.fail(f"Importing the polystar module failed because it was not found with message\n\t{exception}")
-        except:
-            self.fail(f"Importing the polystar module failed without known reason")
+        except ImportError as exception:
+            self.fail(f"Importing the polystar module failed with message\n{exception}")
 
 

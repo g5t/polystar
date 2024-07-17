@@ -41,8 +41,15 @@ template<typename T, typename R, typename S, size_t N, size_t I, size_t M> void 
   for (size_t i=0;i<N;i++) for (size_t j=0;j<M;j++) for (size_t k=0;k<I;k++) C[i*M+j] += T(A[i*I+k]*B[k*M+j]);
 }
 template<typename T, typename R, typename S, size_t N> void multiply_matrix_matrix(T *C, const R *A, const S *B){ multiply_arrays<T,R,S,N,N,N>(C,A,B); }
-template<typename T, typename R, typename S, size_t N> void multiply_matrix_vector(T *C, const R *A, const S *b){ multiply_arrays<T,R,S,N,N,1>(C,A,b); }
-template<typename T, typename R, typename S, size_t N> void multiply_vector_matrix(T *C, const R *a, const S *B){ multiply_arrays<T,R,S,1,N,N>(C,a,B); }
+template<typename T, typename R, typename S, size_t N> void multiply_matrix_vector(T *C, const R *A, const S *v){ multiply_arrays<T,R,S,N,N,1>(C,A,v); }
+template<typename T, typename R, typename S, size_t N> void multiply_vector_matrix(T *C, const R *v, const S *B){ multiply_arrays<T,R,S,1,N,N>(C,v,B); }
+
+template<typename T, typename R, typename S, size_t N> void multiply_matrix_vector(T * C, const std::vector<R> & A, const std::vector<S> & v){
+  multiply_arrays<T,R,S,N,N,1>(C, A.data(), v.data());
+}
+template<typename T, typename R, typename S, size_t N> void multiply_matrix_vector(T * C, const R * A, const std::vector<S> & v){
+  multiply_arrays<T,R,S,N,N,1>(C, A, v.data());
+}
 
 
 // array multiplication specialization for non-complex * complex arrays.
@@ -210,6 +217,14 @@ template<typename S, typename T, typename R>
 S vector_dot(const size_t n, const T* a, const R* b){
   S out = 0;
   for (size_t i=0; i<n; ++i) out += static_cast<S>(a[i])*static_cast<S>(b[i]);
+  return out;
+}
+template<typename S, typename T, typename R>
+S vector_dot(const std::vector<T>& a, const std::vector<R>& b){
+  S out = 0;
+  for (size_t i=0; i<a.size(); ++i) {
+    out += static_cast<S>(a[i]) * static_cast<S>(b[i]);
+  }
   return out;
 }
 
