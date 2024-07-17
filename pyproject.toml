@@ -44,15 +44,16 @@ Repository = "https://github.com/g5t/polystar.git"
 Issues = "https://github.com/g5t/polystar/issues"
 
 [tool.setuptools.packages.find]
-include= ["polystar*"]
+where = ["pysrc"]
+include = ["polystar"]
 namespaces = false
 
 [tool.setuptools_scm]
 
 [tool.cibuildwheel]
 archs = ["auto64"]
-test-command = "python -m unittest discover -s {package}/wrap/tests"
-before-test = "pip install numpy"
+test-requires = ["numpy", "pytest"]
+test-command = "pytest {package}/wrap/tests"
 build-verbosity = 1
 skip = ["cp36-*", "cp37-*", "pp*"]
 test-skip = "cp38-musllinux*"
