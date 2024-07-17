@@ -1249,11 +1249,6 @@ const T& Array2<T>::val(std::initializer_list<I> l) const {
 }
 
 template<class T>
-const T * Array2<T>::cptr(const ind_t i0) const {
-  // Ensure that _data is C-contiguous, possibly via a view, then return a pointer
-  return contiguous_row_ordered_copy(i0).ptr(0u);
-}
-template<class T>
 std::vector<T> Array2<T>::to_std(const ind_t i0) const {
   auto a0 = contiguous_row_ordered_copy(i0);
   std::vector<T> out;

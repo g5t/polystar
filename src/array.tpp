@@ -1061,11 +1061,6 @@ const T& Array<T>::val(std::initializer_list<I> l) const {
 }
 
 template<class T>
-const T* Array<T>::cptr(const ind_t i0) const {
-  return contiguous_row_ordered_copy(i0).ptr(0u);
-}
-
-template<class T>
 std::vector<T> Array<T>::to_std(const ind_t i0) const {
   auto a0 = contiguous_row_ordered_copy(i0);
   // a0 is contiguous (and either a new copy or a view into this data)

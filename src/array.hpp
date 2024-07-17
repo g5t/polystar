@@ -521,7 +521,6 @@ public:
   template<class ... Subs, class=std::enable_if_t<polystar::utils::are_same<ind_t,Subs...>::value, void>>
   const T* ptr(ind_t i0, Subs... subscripts) const;
   const T* ptr(const shape_t& partial_subscript) const;
-  const T* cptr(ind_t i0) const;
   T& val(const ind_t i0);
   template<class ... Subs, class=std::enable_if_t<polystar::utils::are_same<ind_t,Subs...>::value, void>>
   T& val(const ind_t i0, Subs... subscripts);
