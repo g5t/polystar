@@ -24,6 +24,7 @@ along with polystar. If not, see <https://www.gnu.org/licenses/>.            */
 #include <algorithm>
 #include "approx_float.hpp"
 #include "math.hpp"
+#include "types.hpp"
 
 namespace polystar{
 
@@ -48,7 +49,7 @@ template<typename T, int N=3> bool equal_matrix(const T *A /*!< a*/, const T *B/
 template<typename T, int N=3> bool equal_vector(const T *A /*!< a*/, const T *B/*!< b*/, const T tol=0/*!< tolerance multiplier*/);
 
 
-/*! \brief Array multiplation
+/*! \brief Array multiplication
 
 \f$ C = A B \f$
 
@@ -57,7 +58,7 @@ template<typename T, int N=3> bool equal_vector(const T *A /*!< a*/, const T *B/
 \param[in]  B pointer to the first element of a `I`×`M` array
 */
 template<typename T, typename R, typename S, size_t N, size_t I, size_t M> void multiply_arrays(T *C, const R *A, const S *B);
-/*! \brief Matrix multiplation
+/*! \brief Matrix multiplication
 
 \f$ C = A B \f$
 
@@ -66,7 +67,7 @@ template<typename T, typename R, typename S, size_t N, size_t I, size_t M> void 
 \param[in]  B pointer to the first element of a `N`×`M` array
 */
 template<typename T, typename R, typename S, size_t N=3> void multiply_matrix_matrix(T *C, const R *A, const S *B);
-/*! \brief Matrix-vector multiplation
+/*! \brief Matrix-vector multiplication
 
 \f$ C = A v \f$
 
@@ -75,7 +76,9 @@ template<typename T, typename R, typename S, size_t N=3> void multiply_matrix_ma
 \param[in]  v pointer to the first element of a `N` vector
 */
 template<typename T, typename R, typename S, size_t N=3> void multiply_matrix_vector(T *C, const R *A, const S *v);
-/*! \brief Vector-matrix multiplation
+template<typename T, typename R, typename S, size_t N=3> void multiply_matrix_vector(T * C, const std::vector<R> & A, const std::vector<S> & v);
+template<typename T, typename R, typename S, size_t N=3> void multiply_matrix_vector(T * C, const R * A, const std::vector<S> & v);
+/*! \brief Vector-matrix multiplication
 
 \f$ C = v^T B \f$
 
@@ -85,7 +88,7 @@ template<typename T, typename R, typename S, size_t N=3> void multiply_matrix_ve
 */
 template<typename T, typename R, typename S, size_t N=3> void multiply_vector_matrix(T *C, const R *v, const S *B);
 
-/*! \brief Array multiplation with runtime specified dimensions
+/*! \brief Array multiplication with runtime specified dimensions
 
 \f$ C = A B \f$
 
@@ -105,7 +108,7 @@ template<class T, class R, class S, class I> void mul_arrays(std::complex<T>* C,
 template<class T, class R, class S, class I> void mul_arrays(std::complex<T>* C, const I n, const I l, const I m, const std::complex<R>* A, const S* B);
 template<class T, class R, class S, class I> void mul_arrays(std::complex<T>* C, const I n, const I l, const I m, const std::complex<R>* A, const std::complex<S>* B);
 #endif
-/*! \brief Matrix multiplation with runtime specified dimension
+/*! \brief Matrix multiplication with runtime specified dimension
 
 \f$ C = A B \f$
 
@@ -117,7 +120,7 @@ template<class T, class R, class S, class I> void mul_arrays(std::complex<T>* C,
 \see mul_arrays
 */
 template<class T, class R, class S, class I> void mul_mat_mat(T* C, const I n, const R* A, const S* B){ mul_arrays(C, n, n, n, A, B);}
-/*! \brief Matrix-vector multiplation with runtime specified dimension
+/*! \brief Matrix-vector multiplicationv with runtime specified dimension
 
 \f$ C = A v \f$
 
@@ -129,7 +132,21 @@ template<class T, class R, class S, class I> void mul_mat_mat(T* C, const I n, c
 \see mul_arrays
 */
 template<class T, class R, class S, class I> void mul_mat_vec(T* C, const I n, const R* A, const S* B){ mul_arrays(C, n, n, I(1), A, B);}
-/*! \brief Vector-matrix multiplation with runtime specified dimension
+/*! \brief Matrix-vector multiplication with runtime specified dimension
+
+\f$ C = A v \f$
+
+\param[out] C pointer to the first element of a `n` vector
+\param[in]  A a `n`×`n` matrix as row-ordered flattened contiguous data
+\param[in]  B a `n` element std::vector
+
+\see mul_arrays
+*/
+template<class T, class R, class S> void mul_mat_vec(T* C, const R * A, const std::vector<S>& B){
+  auto n = B.size();
+  mul_arrays(C, n, n, 1, A, B.data());
+}
+/*! \brief Vector-matrix multiplication with runtime specified dimension
 
 \f$ C = v B \f$
 
@@ -369,15 +386,39 @@ public:
 template<typename T, typename R, typename S> class vector_cross_impl<T,R,S,3>{
 public:
     static void vector_cross(T * c, const R * a, const S * b) {
-        c[0] = static_cast<T>(a[1])* static_cast<T>(b[2]) - static_cast<T>(a[2])* static_cast<T>(b[1]);
-        c[1] = static_cast<T>(a[2])* static_cast<T>(b[0]) - static_cast<T>(a[0])* static_cast<T>(b[2]);
-        c[2] = static_cast<T>(a[0])* static_cast<T>(b[1]) - static_cast<T>(a[1])* static_cast<T>(b[0]);
+      auto a0 = static_cast<T>(a[0]);
+      auto a1 = static_cast<T>(a[1]);
+      auto a2 = static_cast<T>(a[2]);
+      auto b0 = static_cast<T>(b[0]);
+      auto b1 = static_cast<T>(b[1]);
+      auto b2 = static_cast<T>(b[2]);
+      c[0] = a1 * b2 - a2 * b1;
+      c[1] = a2 * b0 - a0 * b2;
+      c[2] = a0 * b1 - a1 * b0;
     }
+  static void vector_cross(T * c, const std::vector<R> & a, const std::vector<S> & b) {
+      auto a0 = static_cast<T>(a[0]);
+      auto a1 = static_cast<T>(a[1]);
+      auto a2 = static_cast<T>(a[2]);
+      auto b0 = static_cast<T>(b[0]);
+      auto b1 = static_cast<T>(b[1]);
+      auto b2 = static_cast<T>(b[2]);
+      c[0] = a1 * b2 - a2 * b1;
+      c[1] = a2 * b0 - a0 * b2;
+      c[2] = a0 * b1 - a1 * b0;
+  }
 };
 template<typename T, typename R, typename S> class vector_cross_impl<T,R,S,2>{
 public:
   static void vector_cross(T * c, const R * a, const S * b) {
     c[0] = static_cast<T>(a[0])* static_cast<T>(b[1]) - static_cast<T>(a[1])* static_cast<T>(b[0]);
+  }
+  static void vector_cross(T * c, const std::vector<R> & a, const std::vector<S> & b){
+    auto a0 = static_cast<T>(a[0]);
+    auto a1 = static_cast<T>(a[1]);
+    auto b0 = static_cast<T>(b[0]);
+    auto b1 = static_cast<T>(b[1]);
+    c[0] = a0 * b1 - a1 * b0;
   }
 };
 #endif
@@ -397,10 +438,36 @@ and \f$\vec{b}=\left(b_x,b_y,b_z\right)\f$:
 \note The dimensionality of the vectors is defined by the template parameter `N`.
       Since the cross product is only defined in 3-dimensions this function will
       throw a `std::runtime_error` for `N` ≠ 3.
+      Except in the special case of N=2, where the result is zero-dimensional, but
+      stored in the first element of c.
 */
 template<typename T, typename R, typename S, int N = 3>
 void vector_cross(T* c, const R* a, const S* b) {
     vector_cross_impl<T, R, S, N>::vector_cross(c, a, b);
+}
+/*! \brief Take the vector cross product between two 3-vectors
+
+Perform the cross prduct betwen two vectors, \f$\vec{a} = \left(a_x, a_y, a_z\left) \f$
+and \f$\vec{b}=\left(b_x,b_y,b_z\right)\f$:
+\f[
+\vec{a} \times \vec{b} \equiv \left(a_y b_z - b_y a_z, a_z b_x - a_x b_z, a_x b_y - b_x a_y \right)
+\f]
+
+\param[out] c The pointer to the first element of the result vector
+\param[in]  a The pointer to the first element of the first vector, \f$a_x\f$
+\param      a_stride The number of elements of type R between elements of the vector
+\param[in]  b The pointer to the first element of the second vecotr, \f$b_x\f$
+\param      b_stride The number of elements of type S between elements of the vector
+
+\note The dimensionality of the vectors is defined by the template parameter `N`.
+      Since the cross product is only defined in 3-dimensions this function will
+      throw a `std::runtime_error` for `N` ≠ 3.
+      Except in the special case of N=2, where the result is zero-dimensional, but
+      stored in the first element of c.
+*/
+template<typename T, typename R, typename S, int N = 3>
+void vector_cross(T* c, const std::vector<R> && a, const std::vector<S> && b) {
+  vector_cross_impl<T, R, S, N>::vector_cross(c, std::move(a), std::move(b));
 }
 /*! \brief Calculate the dot product of two vectors whose size is only known at runtime
 
@@ -409,7 +476,8 @@ void vector_cross(T* c, const R* a, const S* b) {
 \param[in] b pointer to the first element of a `n` vector
 \returns the value of `a`⋅`b` ≡ ∑ᵢⁿaᵢbᵢ
 */
-template<typename S,typename T, typename R> S vector_dot(const size_t n, const T* a, const R* b);
+template<typename S, typename T, typename R> S vector_dot(size_t n, const T* a, const R* b);
+template<typename S, typename T, typename R> S vector_dot(const std::vector<T> & a, const std::vector<R> & b);
 /*! \brief Calculate the dot product of two vectors whose size is known at compilation
 
 \param[in] a pointer to the first element of a `N` vector
@@ -418,7 +486,7 @@ template<typename S,typename T, typename R> S vector_dot(const size_t n, const T
 */
 template<typename R, int N=3> R vector_dot(const R *a, const R *b);
 //! Return the remainder of a/1, ensuring the result is within the range (0,1]
-template<typename T> T mod1(const T a);
+template<typename T> T mod1(T a);
 
 /*! \brief Determine if a floating point matrix holds only integer values
 

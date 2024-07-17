@@ -971,11 +971,13 @@ T* Array<T>::ptr(const shape_t& p){
 
 template<class T>
 const T* Array<T>::ptr() const {
+  debug_update("Consider replacing this by Array::data()");
   shape_t idx(_shape.size(), 0);
   return _data + s2l_d(idx);
 }
 template<class T>
 const T* Array<T>::ptr(const ind_t i0) const {
+  debug_update("Consider replacing this by Array::to_std(i0)");
   assert(i0 < _shape[0]);
   shape_t idx(_shape.size(), 0);
   idx[0] = i0;
@@ -984,12 +986,14 @@ const T* Array<T>::ptr(const ind_t i0) const {
 template<class T>
 template<class ... Subs, class>
 const T* Array<T>::ptr(const ind_t i0, Subs... subscripts) const {
+  debug_update("Consider replacing this by Array::val(i0, ...)");
   const size_t nsub = 1+sizeof...(Subs);
   if (nsub != this->ndim()) throw std::runtime_error("Wrong number of subscripts for value access");
   return this->ptr(polystar::utils::make_vector(i0, subscripts...));
 }
 template<class T>
 const T* Array<T>::ptr(const shape_t& p) const {
+  debug_update("Consider replacing this by Array::val(shape_t p)");
   assert(p.size() <= _shape.size());
   for (size_t i=0; i<p.size(); ++i) assert(p[i] < _shape[i]);
   shape_t idx(_shape.size(), 0);
@@ -1057,6 +1061,20 @@ const T& Array<T>::val(std::initializer_list<I> l) const {
 }
 
 template<class T>
+std::vector<T> Array<T>::to_std(const ind_t i0) const {
+  auto a0 = contiguous_row_ordered_copy(i0);
+  // a0 is contiguous (and either a new copy or a view into this data)
+  // so we can just iterate over all of its entries
+  std::vector<T> out(a0.numel());
+  size_t i{0};
+  for (auto x: a0.valItr()) {
+    out[i++] = x;
+  }
+  debug_update_if(i != out.size(), "The array iterator did not cover all values?");
+  return out;
+}
+
+template<class T>
 Array<T> Array<T>::contiguous_copy() const {
   if (this->is_contiguous()) return Array<T>(*this);
   Array<T> out(_shape, this->calculate_stride(_shape));
@@ -1072,6 +1090,25 @@ Array<T> Array<T>::contiguous_row_ordered_copy() const {
   for (size_t i=st.size()-1; i--;) st[i] = st[i+1]*_shape[i+1];
   Array<T> out(_shape, st);
   for (auto x : SubIt<ind_t>(_shape)) out[x] = (*this)[x];
+  return out;
+}
+
+template<class T>
+Array<T> Array<T>::contiguous_row_ordered_copy(ind_t i0) const {
+  if (is_row_ordered() && is_contiguous()) {
+    return view(i0);
+  }
+  // make sure we calculate a row-ordered stride:
+  shape_t st(_shape.size(), 1u);
+  for (size_t i=st.size()-1; i--;) st[i] = st[i+1]*_shape[i+1];
+  shape_t sh = _shape;
+  sh[0] = 1u;
+  Array<T> out(sh, st);
+  for (auto x : SubIt<ind_t>(sh)) {
+    auto y = x;
+    y[0] = i0;
+    out[x] = (*this)[y];
+  }
   return out;
 }
 

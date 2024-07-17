@@ -48,7 +48,7 @@ public:
   using sItr = SubIt2<ind_t>;
   using aItr = Array2It<T>;
 protected:
-  T*    _data;     //! A (possilby shared) raw pointer
+  T*    _data;     //! A (possibly shared) raw pointer
   ind_t _num;      //! The number of elements stored under the raw pointer
   ind_t _shift;    //! A linear shift to where our subscript indexing begins (_data+shift)[subscript]
   bool  _own;      //! Whether we need to worry about memory management of the pointer
@@ -86,6 +86,10 @@ public:
   [[nodiscard]] ind_t size(const ind_t dim) const {
     assert(dim < 2);
     return _shape[dim];
+  }
+  [[nodiscard]] ind_t stride(const ind_t dim) const {
+    assert(dim < 2);
+    return _stride[dim];
   }
   [[nodiscard]] shape_t shape() const {return _shape;}
   [[nodiscard]] shape_t stride() const {return _stride;}
@@ -516,6 +520,7 @@ public:
   const T* ptr(ind_t i0) const;
   const T* ptr(ind_t i0, ind_t j0) const;
   const T* ptr(const shape_t& partial_subscript) const;
+
   T& val(ind_t i0);
   T& val(ind_t i0, ind_t j0);
   T& val(const shape_t& partial_subscript);
@@ -525,8 +530,12 @@ public:
   const T& val(const shape_t& partial_subscript) const;
   template<class I> const T& val(std::initializer_list<I> l) const;
 
+  std::vector<T> to_std(ind_t i0) const;
+
   Array2<T> contiguous_copy() const;
   Array2<T> contiguous_row_ordered_copy() const;
+  //! Return the first-dimension Array with index i0
+  Array2<T> contiguous_row_ordered_copy(ind_t i0) const;
 
   Array2<T> abs() const;
   template<class R> bool is_permutation(const Array2<R>& other, T Ttol=T(0), R Rtol=R(0), int tol=1) const;

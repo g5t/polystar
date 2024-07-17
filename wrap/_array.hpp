@@ -141,11 +141,13 @@ namespace polystar {
       throw std::runtime_error("polystar::Array2 objects require 2D input!");
     std::array<ind_t,2> shape{{0,0}}, stride{{0,0}};
     auto num = polystar::utils::s2u<ind_t,pybind11::ssize_t>(info.size);
+
     for (pybind11::ssize_t i=0; i<info.ndim; ++i){
       shape[i] = static_cast<ind_t>(info.shape[i]);
       stride[i] = static_cast<ind_t>(info.strides[i]/sizeof(T));
       if (shape[i]*stride[i] > num) num = shape[i]*stride[i];
     }
+
     T* ptr = (T*) info.ptr;
     bool own_memory{false}; // we NEVER own the memory coming from Python
     bool py_mutable{!info.readonly};

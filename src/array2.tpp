@@ -1186,16 +1186,19 @@ T* Array2<T>::ptr(const shape_t& p){
 
 template<class T>
 const T* Array2<T>::ptr(const ind_t i0) const {
+  debug_update("Consider replacing this by Array2::to_std(i0)");
   assert(i0 < _shape[0]);
   return _data + ij2l_d(i0, 0u);
 }
 template<class T>
 const T* Array2<T>::ptr(const ind_t i0, const ind_t j0) const {
+  debug_update("Consider replacing this by Array2::val(i0, j0)");
   assert(i0 < _shape[0] && j0 < _shape[1]);
   return _data + ij2l_d(i0, j0);
 }
 template<class T>
 const T* Array2<T>::ptr(const shape_t& p) const {
+  debug_update("Consider replacing this by Array2::val(shape_t p)");
   assert(p[0]<_shape[0] && p[1]<_shape[1]);
   return _data + s2l_d(p);
 }
@@ -1246,6 +1249,17 @@ const T& Array2<T>::val(std::initializer_list<I> l) const {
 }
 
 template<class T>
+std::vector<T> Array2<T>::to_std(const ind_t i0) const {
+  auto a0 = contiguous_row_ordered_copy(i0);
+  std::vector<T> out;
+  out.reserve(a0.numel());
+  for (auto x: a0.valItr()){
+    out.push_back(x);
+  }
+  return out;
+}
+
+template<class T>
 Array2<T> Array2<T>::contiguous_copy() const {
   if (this->is_contiguous()) return Array2<T>(*this);
   Array2<T> out(_shape, this->calculate_stride(_shape));
@@ -1258,6 +1272,24 @@ Array2<T> Array2<T>::contiguous_row_ordered_copy() const {
   if (this->is_row_ordered() && this->is_contiguous()) return Array2<T>(*this);
   Array2<T> out(_shape, this->calculate_stride(_shape));
   for (auto x : this->subItr()) out[x] = (*this)[x];
+  return out;
+}
+
+template<class T>
+Array2<T> Array2<T>::contiguous_row_ordered_copy(const ind_t i0) const {
+  if (is_row_ordered() && is_contiguous()) {
+    view(i0);
+  }
+  shape_t st{{1u, 1u}};
+  for (size_t i=st.size()-1; i--;) st[i] = st[i+1]*_shape[i+1];
+  auto sh = _shape;
+  sh[0] = 1u;
+  Array2<T> out(sh, st);
+  for (auto x : SubIt2<ind_t>(sh)) {
+    auto y = x;
+    y[0] = i0;
+    out[x] = (*this)[y];
+  }
   return out;
 }
 

@@ -168,19 +168,19 @@ ARRAY_LATVEC_BINARY_OP(/)
   cross(const L<T>& a, const L<R>& b) {
     using namespace polystar::utils;
     assert( a.size(1) == 3 && b.size(1)==3 );
-    assert( a.is_row_ordered() && b.is_row_ordered() && a.is_contiguous() && b.is_contiguous() );
     polystar::ind_t aN=a.size(0), bN=b.size(0);
     assert( 1u==aN || 1u==bN || aN==bN );
     polystar::ind_t oO = (1u == aN) ? bN : aN;
     auto oarray = L<S>(oO, 3u); // row-ordered contiguous
-    if (1u == aN || 1u == bN){
-      if (1u == aN){
-        for (polystar::ind_t j=0; j<bN; ++j) vector_cross<S,T,R,3>(oarray.ptr(j), a.ptr(0), b.ptr(j));
-      } else {
-        for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,3>(oarray.ptr(j), a.ptr(j), b.ptr(0));
-      }
+    // ensure a and b are C-contiguous -- only a view if already the case
+    auto ca = a.contiguous_row_ordered_copy();
+    auto cb = b.contiguous_row_ordered_copy();
+    if (1u == aN){
+      for (polystar::ind_t j=0; j<bN; ++j) vector_cross<S,T,R,3>(oarray.ptr(j), ca.ptr(0), cb.ptr(j));
+    } else if (1u == bN) {
+      for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,3>(oarray.ptr(j), ca.ptr(j), cb.ptr(0));
     } else {
-      for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,3>(oarray.ptr(j), a.ptr(j), b.ptr(j));
+      for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,3>(oarray.ptr(j), ca.ptr(j), cb.ptr(j));
     }
     return oarray;
   }
@@ -190,19 +190,19 @@ ARRAY_LATVEC_BINARY_OP(/)
   cross2d(const L<T>& a, const L<R>& b) {
     using namespace polystar::utils;
     assert( a.size(1) == 2 && b.size(1)== 2 );
-    assert( a.is_row_ordered() && b.is_row_ordered() && a.is_contiguous() && b.is_contiguous() );
     polystar::ind_t aN=a.size(0), bN=b.size(0);
     assert( 1u==aN || 1u==bN || aN==bN );
     polystar::ind_t oO = (1u == aN) ? bN : aN;
     auto oarray = L<S>(oO, 1u); // row-ordered contiguous
-    if (1u == aN || 1u == bN){
-      if (1u == aN){
-        for (polystar::ind_t j=0; j<bN; ++j) vector_cross<S,T,R,2>(oarray.ptr(j), a.ptr(0), b.ptr(j));
-      } else {
-        for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,2>(oarray.ptr(j), a.ptr(j), b.ptr(0));
-      }
+    // ensure a and b are C-contiguous -- only a view if already the case
+    auto ca = a.contiguous_row_ordered_copy();
+    auto cb = b.contiguous_row_ordered_copy();
+    if (1u == aN) {
+      for (polystar::ind_t j=0; j<bN; ++j) vector_cross<S,T,R,2>(oarray.ptr(j), ca.ptr(0), cb.ptr(j));
+    } else if (1u == bN) {
+      for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,2>(oarray.ptr(j), ca.ptr(j), cb.ptr(0));
     } else {
-      for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,2>(oarray.ptr(j), a.ptr(j), b.ptr(j));
+      for (polystar::ind_t j=0; j<aN; ++j) vector_cross<S,T,R,2>(oarray.ptr(j), ca.ptr(j), cb.ptr(j));
     }
     return oarray;
   }
@@ -247,18 +247,20 @@ dot(const A<T>& a, const A<R>& b) {
   using namespace polystar::utils;
   assert( a.size(1) == b.size(1) );
   assert( a.is_row_ordered() && b.is_row_ordered() && a.is_contiguous() && b.is_contiguous() );
-  polystar::ind_t aN=a.size(0), bN=b.size(0), d=a.size(1);
+  polystar::ind_t aN=a.size(0), bN=b.size(0);
+  auto d = a.size(1);
   assert( 1u==aN || 1u==bN || aN==bN );
   polystar::ind_t oO = (1u == aN) ? bN : aN;
   auto oarray = A<S>(oO, 1u);
-  if (1u==aN || 1u==bN) {
-    if (1u==aN){
-      for (polystar::ind_t i=0; i<bN; ++i) oarray.val(i,0) = vector_dot<S,T,R>(d, a.ptr(0), b.ptr(i));
-    } else {
-      for (polystar::ind_t i=0; i<aN; ++i) oarray.val(i,0) = vector_dot<S,T,R>(d, a.ptr(i), b.ptr(0));
-    }
+  // ensure a and b are C-contiguous -- only a view if already the case
+  auto ca = a.contiguous_row_ordered_copy();
+  auto cb = b.contiguous_row_ordered_copy();
+  if (1u==aN){
+    for (polystar::ind_t i=0; i<bN; ++i) oarray.val(i,0) = vector_dot<S,T,R>(d, ca.ptr(0), cb.ptr(i));
+  } else if (1u==bN) {
+    for (polystar::ind_t i=0; i<aN; ++i) oarray.val(i,0) = vector_dot<S,T,R>(d, ca.ptr(i), cb.ptr(0));
   } else {
-    for (polystar::ind_t i=0; i<aN; ++i) oarray.val(i,0) = vector_dot<S,T,R>(d, a.ptr(i), b.ptr(i));
+    for (polystar::ind_t i=0; i<aN; ++i) oarray.val(i,0) = vector_dot<S,T,R>(d, ca.ptr(i), cb.ptr(i));
   }
   return oarray;
 }
@@ -267,7 +269,8 @@ template<class T, class R, class M, template<class> class A, class S=std::common
 std::enable_if_t<bothArrays<T,A,R,A>, S>
 same_lattice_dot(const A<R>& x, const A<T>& y, const std::array<M,9>& metric){
   std::array<S,3> tmp{0,0,0};
-  utils::mul_mat_vec(tmp.data(), 3u, metric.data(), x.ptr(0));
+  auto cx = x.contiguous_row_ordered_copy();
+  utils::mul_mat_vec(tmp.data(), metric.data(), cx.ptr(0));
   S out{0};
   for (int i=0; i<3; ++i) out += tmp[i] * static_cast<S>(y[i]);
 //  verbose_update("metric x ", x.to_string(0), " = ", tmp , "; dot with ", y.to_string(0), " = ", out);
@@ -444,7 +447,7 @@ operator*(const std::array<R,9>& m, const L<T>& a){
   L<S> out(a.type(), a.lattice(), ashape);
   ashape.back() = 0;
   for (auto x : a.subItr(ashape))
-    polystar::utils::multiply_matrix_vector<S,R,T,3>(out.ptr(x), m.data(), a.ptr(x));
+    polystar::utils::multiply_matrix_vector<S,R,T,3>(out.ptr(x), m.data(), a.to_data(x));
   return out;
 }
 
@@ -589,7 +592,8 @@ from_xyz_like(const A<T>& lv, const B<T>& b){
   B<S> coords(b.shape());
   auto x = b.shape();
   x.back() = 0u;
-  for (auto i: b.subItr(x)) utils::multiply_matrix_vector(coords.ptr(i), inv_xyz.data(), b.ptr(i));
+  auto cb = b.contiguous_row_ordered_copy();
+  for (auto i: b.subItr(x)) utils::multiply_matrix_vector(coords.ptr(i), inv_xyz.data(), cb.ptr(i));
   return A<S>(lv.type(), lat, coords);
 }
 
