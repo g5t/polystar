@@ -68,6 +68,20 @@ void define_polygon(py::class_<A> & cls){
     return p.to_svg(std::make_optional(fill), std::make_optional(stroke));
   }, py::kw_only(), "fill"_a="none", "stroke"_a="black");
 
+  cls.def("transform", [](const A & p, py::array_t<T>& pyv){
+    auto info = pyv.request();
+    if (info.ndim != 2 || info.size != 4 || info.shape[0] != 2 || info.shape[1] != 2) {
+      throw std::runtime_error("polystar::Polygon::transform takes a 2x2 array");
+    }
+    std::array<T, 4> matrix;
+    matrix[0] = ((T *) info.ptr)[0];
+    matrix[1] = ((T *) info.ptr)[info.strides[1]/info.itemsize];
+    matrix[2] = ((T *) info.ptr)[info.strides[0]/info.itemsize];
+    matrix[3] = ((T *) info.ptr)[(info.strides[0] + info.strides[1])/info.itemsize];
+    return p.transform(matrix);
+  }, "matrix"_a);
+  cls.def("skew", &A::skew);
+
 // overloaded operations:
   cls.def("__eq__", [](const A& p, const A& o){return p == o;});
   cls.def("__neq__", [](const A& p, const A& o){return p != o;});
