@@ -675,7 +675,7 @@ Array2<S> operator* (const std::array<T,N> & matrix, const Array2<R> & vectors){
     throw std::runtime_error("Expected " + std::to_string(n) + " square matrix but provided "
                              + std::to_string(N) + " element array");
   }
-  auto v = vectors.contiguous_row_ordered_copy();
+  auto v = vectors.contiguous_row_ordered_copy().decouple();
   std::vector<T> tmp(n);
   for (ind_t i=0; i<v.size(0u); ++i){
     utils::mul_mat_vec(tmp.data(), n, matrix.data(), v.ptr(i));
