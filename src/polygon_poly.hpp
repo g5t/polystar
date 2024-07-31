@@ -118,6 +118,19 @@ namespace polystar::polygon{
     Poly<T,A> centre() const {return {vertices_ - centroid(), wires_};}
     Poly<T,A> translate(const A<T>& v) const {return {vertices_ + v, wires_};}
 
+    Poly<T,A> transform(const std::array<T,4>& matrix) const {return {matrix * vertices_, wires_};}
+    Poly<T,A> skew(T factor, int source, int sink) const {
+      if (source == sink) {
+        throw std::logic_error("polystar::polygon::Poly::skew: source can not equal sink");
+      }
+      if (source < 0 || source > 1 || sink < 0 || sink > 1) {
+        throw std::logic_error("polystar::polygon::Poly::skew: source and sink must be in bounds");
+      }
+      std::array<T, 4> matrix{{1, 0, 0, 1}};
+      matrix[source * 2 + sink] = factor;
+      return transform(matrix);
+    }
+
     template<class R, template<class> class B>
       [[nodiscard]] std::vector<bool> border_contains(const B<R>& x) const {
       return wires_.border_contains(x, vertices_);

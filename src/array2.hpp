@@ -668,6 +668,22 @@ public:
   T* operator->() {return &(array[*subit]);}
 };
 
+template<class T, class R, size_t N, class S = std::common_type_t<T,R>>
+Array2<S> operator* (const std::array<T,N> & matrix, const Array2<R> & vectors){
+  auto n = vectors.size(1u);
+  if (N != n * n) {
+    throw std::runtime_error("Expected " + std::to_string(n) + " square matrix but provided "
+                             + std::to_string(N) + " element array");
+  }
+  auto v = vectors.contiguous_row_ordered_copy().decouple();
+  std::vector<T> tmp(n);
+  for (ind_t i=0; i<v.size(0u); ++i){
+    utils::mul_mat_vec(tmp.data(), n, matrix.data(), v.ptr(i));
+    std::copy(tmp.data(), tmp.data()+n, v.ptr(i));
+  }
+  return v;
+}
+
 
 #include "array2.tpp"
 } // end namespace polystar
