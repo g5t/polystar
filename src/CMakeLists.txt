@@ -60,6 +60,7 @@ list(APPEND CXX_SOURCES
   bitmap_show.cpp
   polygon_wire.cpp
   polygon_wires.cpp
+  polygon_clipping.cpp
   hdf_interface.cpp
 )
 
