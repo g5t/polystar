@@ -12,6 +12,7 @@
 #include "approx_float.hpp"
 #include "polygon_wires.hpp"
 #include "polygon_network.hpp"
+#include "polygon_clipping.hpp"
 
 #include "svg.hpp"
 #include "triangle.hpp"
@@ -165,21 +166,10 @@ namespace polystar::polygon{
         if (area() > T(0) && wires_.wire_count() == 0) return that;
         return that.insert_hole(simplify(), tol, dig);
       }
-      std::cout << "that_in_this ";
-      for (const auto & t: that_in_this) std::cout << (t ? "1" : "0");
-      std::cout << "\nthis_in_that ";
-      for (const auto & t: this_in_that) std::cout << (t ? "1" : "0");
-      std::cout << "\n";
-      // now the complicated case(s)
-      auto ft = [](bool a, bool b){return !a && b;};
-      auto tf = [](bool a, bool b){return a && !b;};
-      if (!is_cyclic_contiguous(that_in_this.begin(), that_in_this.end(), ft, tf)
-        ||!is_cyclic_contiguous(this_in_that.begin(), this_in_that.end(), ft, tf)) {
-        throw std::runtime_error("Too complicated intersection!");
+      if (wires_.wire_count() || that.wires().wire_count()){
+        return intersection(triangulate(), that.triangulate());
       }
-
-      std::cout << "Returned polygon is wrong.\n";
-      return *this;
+      return intersection(vertices_, wires_.border(), that.vertices(), that.wires().border());
     }
 //    template<class R, template<class> class B>
 //    [[nodiscard]] std::enable_if_t<isArray<R,B>, Poly<T,A>> cut(const B<R>& a, const B<R>& b, const R tol=R(0), const int dig=1) const {
@@ -319,6 +309,155 @@ namespace polystar::polygon{
       auto vert = from_xyz_like(points, bArray<T>::from_std(v));
       return {vert, wires};
     }
+
+  namespace utils {
+    template<class T, template<class> class A>
+    bool
+    could_not_overlap(const A<T> &va, const Wire &wa, const A<T> &vb, const Wire &wb) {
+      auto a_radius = wa.circumscribed_radius(va);
+      auto b_radius = wb.circumscribed_radius(vb);
+      auto a_centre = wa.centroid(va);
+      auto b_centre = wb.centroid(vb);
+      auto d = a_centre.distance(b_centre);
+      return d > a_radius + b_radius;
+    }
+
+
+    template<class T, template<class> class A>
+    bool
+    contains(const A<T> &v0, const Wire &w0, const A<T> &v1, const Wire &w1) {
+      auto one_in_zero = w0.contains(v1.extract(w1), v0);
+      // if all are contained, then the whole is contained
+      return std::all_of(one_in_zero.begin(), one_in_zero.end(), [](const auto x) { return x; });
+    }
+  }
+
+
+  /// \brief Find all intersection points for two polygon wires, then return their intersection polygons
+  template<class T, template<class> class A>
+  std::vector<Poly<T, A>>
+  intersection(const A<T> & va, const Wire & wa, const A<T> & vb, const Wire & wb){
+    // If the two polygons are too far apart, return nothing
+    if (utils::could_not_overlap(va, wa, vb, wb)) return {};
+    // If all of A is inside B, return A
+    if (utils::contains(vb, wb, va, wa)) return {Poly<T, A>(va, wa)};
+    // If all of B is inside A, return b
+    if (utils::contains(va, wa, vb, wb)) return {Poly<T, A>(vb, wb)};
+    // Otherwise, find the intersection points:
+    // Combine the two sets of vertices into a single list
+    auto v = cat(0, va.extract(wa), vb.extract(wb));
+    // Make the new wires for A and B, since we may have reduced or re-ordered their vertices:
+    Wire new_wa, new_wb;
+    new_wa.resize(wa.size());
+    new_wb.resize(wb.size());
+    std::iota(new_wa.begin(), new_wa.end(), 0);
+    std::iota(new_wb.begin(), new_wb.end(), wa.size());
+    // Construct the dual doubly-linked lists of vertex indices
+    auto lists = clip::VertexLists(new_wa, new_wb);
+    auto no_problems = clip::weiler_atherton(v, lists);
+    if (no_problems){
+      std::cerr << "Warning: " << no_problems << " problems found in the Weiler-Atherton algorithm" << std::endl;
+    }
+    auto wires = lists.intersection_wires();
+    std::vector<Poly<T, A>> result;
+    result.reserve(wires.size());
+    for (const auto & w: wires) {
+      auto p = Poly<T, A>(v, w);
+      if (p.area()) result.push_back(p);
+    }
+    return result;
+  }
+
+  /// \brief Find the intersection of two polygons, triangulating if either has any holes
+  template<class T, template<class> class A>
+  std::vector<Poly<T, A>>
+  intersection(const Poly<T, A> & a, const Poly<T, A> & b) {
+    if (a.wires().wire_count() || b.wires().wire_count()){
+      return intersection(a.triangulate(), b.triangulate());
+    }
+    return intersection(a.vertices(), a.wires().border(), b.vertices(), b.wires().border());
+  }
+
+  /// \brief Find the intersection of two triangulated polygon networks by considering all pairs of triangles
+  template<class T, template<class> class A, class W=Wire>
+  std::vector<Poly<T, A>>
+  intersection(const Network<W, T, A> & a, const Network<W, T, A> & b) {
+    std::vector<Poly<T, A>> result;
+    result.reserve(std::max(a.size(), b.size()));
+    for (const auto & wa: a.wires()) {
+      for (const auto & wb: b.wires()) {
+        auto ps = intersection(a.vertices(), wa, b.vertices(), wb);
+        for (const auto & p: ps) if (p.area()) result.push_back(p);
+      }
+    }
+    // TODO go through the resulting polygons and combine any that are touching?
+    return result;
+  }
+
+
+  /// \brief Find all intersection points for two polygon wires, then return their union polygons
+  template<class T, template<class> class A>
+  std::vector<Poly<T, A>>
+  union_polygons(const A<T> & va, const Wire & wa, const A<T> & vb, const Wire & wb){
+    // If the two polygons are too far apart, return both
+    if (utils::could_not_overlap(va, wa, vb, wb)) return {{va, wa}, {vb, wb}};
+    // If all of A is inside B, return B
+    auto a_in_b = wb.contains(va.extract(wa), vb);
+    if (utils::contains(vb, wb, va, wa)) return {{vb, wb}};
+    // If all of B is inside A, return A
+    if (utils::contains(va, wa, vb, wb)) return {{va, wa}};
+    // Otherwise, find the intersection points:
+    // Combine the two sets of vertices into a single list
+    auto v = cat(0, va.extract(wa), vb.extract(wb));
+    // Make the new wires for A and B, since we may have reduced or re-ordered their vertices:
+    Wire new_wa, new_wb;
+    new_wa.resize(wa.size());
+    new_wb.resize(wb.size());
+    std::iota(new_wa.begin(), new_wa.end(), 0);
+    std::iota(new_wb.begin(), new_wb.end(), wa.size());
+    // Construct the dual doubly-linked lists of vertex indices
+    auto lists = clip::VertexLists(new_wa, new_wb);
+    auto no_problems = clip::weiler_atherton(v, lists);
+    if (no_problems){
+      std::cerr << "Warning: " << no_problems << " problems found in the Weiler-Atherton algorithm" << std::endl;
+    }
+    auto wires = lists.union_wires();
+    // the union wires returned vector is {border, hole0, hole1, ...}
+    std::vector<Poly<T, A>> result;
+    result.reserve(1);
+    auto border = wires.front();
+    auto holes = std::vector<Wire>(wires.begin() + 1, wires.end());
+    result.push_back(Poly<T, A>(v, border, holes));
+    return result;
+  }
+
+  /// \brief Find the intersection of two polygons, triangulating if either has any holes
+  template<class T, template<class> class A>
+  std::vector<Poly<T, A>>
+  union_polygons(const Poly<T, A> & a, const Poly<T, A> & b) {
+    if (a.wires().wire_count() || b.wires().wire_count()){
+      return union_polygons(a.triangulate(), b.triangulate());
+    }
+    return union_polygons(a.vertices(), a.wires().border(), b.vertices(), b.wires().border());
+  }
+
+  /// \brief Find the intersection of two triangulated polygon networks by considering all pairs of triangles
+  template<class T, template<class> class A, class W=Wire>
+  std::vector<Poly<T, A>>
+  union_polygons(const Network<W, T, A> & a, const Network<W, T, A> & b) {
+    std::vector<Poly<T, A>> result;
+    result.reserve(std::max(a.size(), b.size()));
+    for (const auto & wa: a.wires()) {
+      for (const auto & wb: b.wires()) {
+        auto ps = union_polygons(a.vertices(), wa, b.vertices(), wb);
+        for (const auto & p: ps) if (p.area()) result.push_back(p);
+      }
+    }
+    // TODO go through the resulting polygons and combine any that are touching?
+    return result;
+  }
+
+
 }
 
 #endif

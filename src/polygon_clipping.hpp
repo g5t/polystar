@@ -1,12 +1,11 @@
 #pragma once
-#include "polygon_poly.hpp"
 #include "polygon_wire.hpp"
 
 namespace polystar::polygon::clip
 {
   using ind_t = polystar::ind_t;
 
-  enum class Type {unknown, entry, exit, original};
+  enum class Type {unknown, entry, exit, original, edge};
   enum class On {neither, A, B, both};
 
   class Vertex{
@@ -55,12 +54,46 @@ namespace polystar::polygon::clip
       if (on == On::A || on == On::both) next_A = v;
       if (on == On::B || on == On::both) next_B = v;
     }
-    [[nodiscard]] ptr next(On on) const {
+    [[nodiscard]] ptr next(On on, Type type = Type::unknown) const {
+      // step to the next ptr on A or B
+      auto n = next_on(on);
+      // if we take any type, or this one happens to be what we want, return it
+      if (Type::unknown == type || n->type() == type) return n;
+      // keep a reference to know where we started
+      auto stop = n;
+      do {
+        // get the next ptr on A or B
+        n = n->next_on(on);
+        // return it if it's the right type
+        if (n->type() == type) return n;
+        // continue until we get a nullptr or back to where we started
+      } while (n != nullptr && n != stop);
+      return nullptr;
+    }
+    [[nodiscard]] ptr prev(On on, Type type = Type::unknown) const {
+      // step to the prev ptr on A or B
+      auto n = prev_on(on);
+      // if we take any type, or this one happens to be what we want, return it
+      if (Type::unknown == type || n->type() == type) return n;
+      // keep a reference to know where we started
+      auto stop = n;
+      do {
+        // get the next ptr on A or B
+        n = n->prev_on(on);
+        // return it if it's the right type
+        if (n->type() == type) return n;
+        // continue until we get a nullptr or back to where we started
+      } while (n != nullptr && n != stop);
+      return nullptr;
+    }
+
+  private:
+    [[nodiscard]] ptr next_on(On on) const {
       if (on == On::A) return next_A;
       if (on == On::B) return next_B;
       return nullptr;
     }
-    [[nodiscard]] ptr prev(On on) const {
+    [[nodiscard]] ptr prev_on(On on) const {
       if (on == On::A) return prev_A;
       if (on == On::B) return prev_B;
       return nullptr;
@@ -110,9 +143,76 @@ namespace polystar::polygon::clip
   public:
     VertexLists(const polystar::polygon::Wire & a, const polystar::polygon::Wire & b): A(a, On::A), B(b, On::B) {}
 
+    [[nodiscard]] Vertex::ptr first(On on) const {
+      if (on == On::A) return A.first();
+      if (on == On::B) return B.first();
+      return nullptr;
+    }
+
     [[nodiscard]] std::vector<Wire> intersection_wires() const;
     [[nodiscard]] std::vector<Wire> union_wires() const;
   };
 
-  // TODO Implement the line segment intersection finder to setup the VertexLists object for two Poly objects
+  template<class T, template<class> class A>
+  int weiler_atherton(const A<T> & v, VertexLists & lists){
+    int no_problems{0};
+    // Walk through both lists of vertices, looking for intersections
+    auto first_a = lists.first(clip::On::A);
+    auto first_b = lists.first(clip::On::B);
+    auto ptr_a = first_a;
+    do {
+      // get the next original wire vertex on A
+      ptr_a = ptr_a->next(clip::On::A, clip::Type::original);
+      // Find Edge A
+      auto edge_a = std::make_pair(ptr_a->value(), ptr_a->next(clip::On::A, clip::Type::original)->value());
+      auto ptr_b = first_b;
+      do {
+        // get the next original wire vertex on B
+        ptr_b = ptr_b->next(clip::On::B, clip::Type::original);
+        // Find Edge B
+        auto edge_b = std::make_pair(ptr_b->value(), ptr_b->next(clip::On::B, clip::Type::original)->value());
+        // Find the intersection point of edge A and edge B
+        auto [valid, at] = intersection2d(v, edge_a, v, edge_b, end_type::second); // include only one of the two ends
+        //
+        if (valid){
+          //  1. Add it to the list of all vertices
+          auto index = v.size();
+          auto match = v.row_is(cmp::eq, at);
+          if (match.any()){
+            // the intersection point is already in the list of vertices
+            index = match.first();
+          } else {
+            // the intersection point is not in the list of vertices
+            index = v.size(0);
+            v = v.append(0, at);
+          }
+
+          //  2. Find whether it points into or out of A.
+          auto a_0 = v.view(edge_a.first);
+          auto r = v.view(edge_b.second) - a_0; // we want to see if edge_b.second is to the right of edge_a
+          auto s = v.view(edge_a.second) - a_0;
+          auto cross = cross2d(r, s).val(0,0);
+          auto type = cross > 0 ? clip::Type::entry : cross < 0 ? clip::Type::exit : clip::Type::edge;
+          if (clip::Type::edge == type){
+            ++no_problems;
+            // use the other point on the edge of B to decide if this points in our out
+            r = v.view(edge_b.first) - a_0;
+            cross = cross2d(r, s).val(0,0);
+            type = cross > 0 ? clip::Type::exit : cross < 0 ? clip::Type::entry : clip::Type::edge;
+          }
+          if (clip::Type::edge == type) ++no_problems;
+
+          //  3. Insert it into the doubly-linked lists of vertices on both A and B
+          auto ptr = std::make_shared<clip::Vertex>(index, type);
+          ptr->prev(clip::On::A, ptr_a);
+          ptr->next(clip::On::A, ptr_a->next(clip::On::A));
+          ptr->prev(clip::On::B, ptr_b);
+          ptr->next(clip::On::B, ptr_b->next(clip::On::B));
+          ptr_a->next(clip::On::A, ptr);
+          ptr_b->next(clip::On::B, ptr);
+        }
+      } while (ptr_b != first_b);
+    } while (ptr_a != first_a);
+    return no_problems;
+  }
 }
