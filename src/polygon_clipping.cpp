@@ -91,3 +91,24 @@ std::vector<Wire> VertexLists::union_wires() const {
 
   return combined;
 }
+
+std::string polystar::polygon::clip::to_string(Type type){
+  switch (type){
+    case Type::unknown: return "?";
+    case Type::entry: return "v";
+    case Type::exit: return "^";
+    case Type::original: return "o";
+    case Type::edge: return "-";
+    default: return "!";
+  }
+}
+
+std::string polystar::polygon::clip::to_string(On on){
+  switch (on){
+    case On::neither: return "_";
+    case On::A: return "A";
+    case On::B: return "B";
+    case On::both: return "+";
+    default: return "!";
+  }
+}

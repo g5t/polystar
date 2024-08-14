@@ -359,6 +359,30 @@ namespace polystar::polygon {
       return out;
     }
 
+    template<class T, class R, template<class> class A>
+    std::vector<bool> is_on(const A<R> & point, const A<T> & x) const {
+      std::vector<bool> out;
+      out.reserve(point.size(0));
+      for (ind_t i=0; i<point.size(0); ++i){
+        auto pi = point.view(i);
+        bool on_edge{false};
+        for (size_t j=0; j<size(); ++j){
+          auto e = edge(j);
+          auto a = x.view(e.first);
+          auto v0 = pi - a;
+          auto v1 = x.view(e.second) - a;
+          auto v0n = norm(v0).val(0, 0);
+          auto v1n = norm(v1).val(0, 0);
+          if (v0n == 0 || (cross2d(v0, v1).sum() == 0 && dot(v0, v1).val(0, 0) > 0  && v0n <= v1n)){
+            on_edge=true;
+            break;
+          }
+        }
+        out.push_back(on_edge);
+      }
+      return out;
+    }
+
     template<class T, template<class> class A>
     std::vector<size_t> crossing_number(const A<T> &point, const A<T> &x, end_type inclusive = end_type::second, bool verbose=false) const {
       std::vector<size_t> out;
@@ -410,7 +434,7 @@ namespace polystar::polygon {
     [[nodiscard]] T circumscribed_radius(const A<T> &x) const {
       auto c = centroid(x);
       T r{0};
-      for (const auto &i: *this) if (auto t = norm(c - x.view(i)); t > r) r = t;
+      for (const auto &i: *this) if (auto t = norm(c - x.view(i)).val(0,0); t > r) r = t;
       return r;
     }
 

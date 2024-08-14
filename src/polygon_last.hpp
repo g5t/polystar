@@ -1,5 +1,14 @@
 #ifndef POLYSTAR_POLYGON_NETWORK_TPP
 #define POLYSTAR_POLYGON_NETWORK_TPP
+#include "polygon_network.hpp"
+#include "polygon_wire.hpp"
+
+/** \file Implements Network methods that depend on Wire
+ *
+ * The two classes have interdependent methods, Wire includes Network
+ * so Network _can't_ include Wire.
+ * This solution works, even if it is somewhat convoluted.
+ */
 
 //static
 //std::tuple<std::array<polystar::ind_t,3>, std::array<polystar::ind_t,3>>

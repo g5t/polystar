@@ -2,7 +2,6 @@
 #define POLYSTAR_POLYGON_HPP
 
 #include "polygon_poly.hpp"
-
-#include "polygon_network.tpp"
+#include "polygon_last.hpp"
 
 #endif
