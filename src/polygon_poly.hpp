@@ -79,7 +79,44 @@ namespace polystar::polygon{
 
     // methods
     [[nodiscard]] Poly<T,A> convex_hull() const {return Poly(vertices_);}
+    /// \brief Remove any internal wires by adding them to the border via new zero-width gaps.
     [[nodiscard]] Poly<T,A> simplify() const {return Poly(vertices_, wires_.simplify(vertices_));}
+    /// \brief Ensure only indexed vertices are kept in the returned Poly object
+    [[nodiscard]] Poly<T,A> without_extraneous_vertices() const {
+      // find the unique vertex indices in the border and all holes
+      auto b = wires_.border();
+      for (const auto & w: wires_.wires()){
+        for (const auto & i: w) {
+          if (std::find(b.begin(), b.end(), i) == b.end()) {
+            b.push_back(i);
+          }
+        }
+      }
+      // extract only those vertices
+      auto v = vertices_.extract(b);
+      // find the map from old vertex indexing to new
+      std::map<ind_t, ind_t> map;
+      for (const auto & x: b){
+        auto m = v.row_is(cmp::eq, vertices_.view(x)).first();
+        map[x] = m;
+      }
+      // use the map to translate
+      auto translate = [&map](const Wire & from, Wire & to){
+        to.reserve(from.size());
+        for (const auto & i: from) to.push_back(map[i]);
+      };
+      // create the new border and holes
+      Wire nb;
+      translate(wires_.border(), nb);
+      std::vector<Wire> nh;
+      nh.reserve(wires_.wire_count());
+      for (const auto & w: wires_.wires()){
+        Wire nw;
+        translate(w, nw);
+        nh.push_back(nw);
+      }
+      return Poly(v, nb, nh);
+    }
 //    Network<Wire,T,A> triangulate() const {
 //      return wires_.triangulate(vertices_);
 //    }
@@ -389,7 +426,7 @@ namespace polystar::polygon{
     // Construct the dual doubly-linked lists of vertex indices
     auto lists = clip::VertexLists(new_wa, new_wb);
     v = clip::weiler_atherton(v, lists); // updates v with intersection points
-    std::cout << "Result of Weiler-Atherton, vertices:\n" << v.to_string() << "lists:\n" << lists << "\n";
+//    std::cout << "Result of Weiler-Atherton, vertices:\n" << v.to_string() << "lists:\n" << lists << "\n";
     auto wires = lists.intersection_wires();
     std::vector<Poly<T, A>> result;
     result.reserve(wires.size());

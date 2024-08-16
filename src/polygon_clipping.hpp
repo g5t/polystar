@@ -216,25 +216,16 @@ namespace polystar::polygon::clip
            * otherwise, pick the vertex which is closest to a1.
            * */
           auto a1 = v.view(edge_a.first);
-          std::cout << v.to_string(edge_a.first) << " -- " << v.to_string(edge_a.second) << " & ";
-          std::cout << v.to_string(edge_b.first) << " -- " << v.to_string(edge_b.second) << " \n";
-          std::cout << "at was " << at.to_string();
           if (at.row_is(cmp::eq, a1).any()){
             at = at.extract(at.row_is(cmp::neq, a1));
           } else {
             auto diff = norm(at - a1); // a (2, 1) Array2
             at = at.extract(diff.row_is(cmp::eq, diff.min(0u)));
           }
-          std::cout << "at is now " << at.to_string();
         }
         if (valid){
           //  1. Add it to the list of all vertices
           auto index = v.size(0);
-          if (at.size(0u) > 1) {
-            std::cout << v.to_string(edge_a.first) << " -- " << v.to_string(edge_a.second) << " & ";
-            std::cout << v.to_string(edge_b.first) << " -- " << v.to_string(edge_b.second) << " \n";
-            std::cout << at.to_string();
-          }
           auto match = v.row_is(cmp::eq, at);
           if (match.any()){
             // the intersection point is already in the list of vertices

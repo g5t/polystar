@@ -12,34 +12,48 @@ std::vector<Wire> VertexLists::intersection_wires() const {
   // Use the Weiler-Atherton algorithm to combine the two wires
   // https://en.wikipedia.org/wiki/Weiler%E2%80%93Atherton_clipping_algorithm
   // https://liorsinai.github.io/mathematics/2023/09/30/polygon-clipping.html
+  // Modified for anticlockwise vertex ordering (start on A instead of B)
 
-  // Walk around wire B, looking for an intersection with wire A that is pointing into A
-  auto v = B.first();
+  // Walk around wire A, looking for an intersection with wire B that is pointing into A
+  auto v = A.first();
+  auto first_start = v;
   do {
-    v->visited(true);
-    if (v->type() == Type::entry){
-      // We have found an intersection point, now walk around wire B until we find the exit point
+    if (!v->visited() && v->type() == Type::entry){
+//      std::cout << "Enter wire at " << v << "\n";
+      // We have found an intersection point, now walk around wire A until we find the exit point
       Wire wire;
       auto start = v;
       do {
         v->visited(true);
         wire.push_back(v->value());
-        v = v->next(On::B);
-      } while (v != start && v->type() != Type::exit);
-      // If we found the exit point, keep walking around A until we find the entry point again
-      if (v != start) {
         v = v->next(On::A);
+      } while (v != start && v->type() != Type::exit);
+      // ensure the exit point gets added to the wire:
+      if (v->type() == Type::exit){
+        wire.push_back(v->value());
+      }
+//      std::cout << "Exit wire at " << v << "\n";
+      // If we found the exit point, keep walking around B until we find the entry point again
+      if (v != start) {
+        v = v->next(On::B);
         while (v != start){
           v->visited(true);
           wire.push_back(v->value());
-          v = v->next(On::A);
+          v = v->next(On::B);
         }
       }
+//      std::cout << "Resulting wire is: [ ";
+//      for (const auto & w: wire) std::cout << w << ", ";
+//      std::cout << "]\n";
       combined.push_back(wire);
     }
-    // Fast-forward over the already-visited vertices
-    while (v->visited() && v != B.first()) v = v->next(On::B);
-  } while (v != B.first());
+    // Record that we visited the point, even if it wasn't an entry
+    v->visited(true);
+    // Step to the next on A
+    v = v->next(On::A);
+    // If it has been visited, fast-forward over it
+    while (v->visited() && v != first_start) v = v->next(On::A);
+  } while (v != first_start);
 
   return combined;
 }
