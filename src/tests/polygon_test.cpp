@@ -151,18 +151,96 @@ TEST_CASE("Edge intersection", "[polygon][edge]"){
 
 }
 
-TEST_CASE("Rectangle intersection"){
-  std::vector<std::array<double, 2>> va_vertices_1{{0, 0}, {2, 0}, {2, 2}, {0, 2}};
-  std::vector<std::array<double, 2>> va_vertices_2{{1, 1}, {3, 1}, {3, 3}, {1, 3}};
-  std::vector<std::array<double, 2>> va_vertices_r{{1, 1}, {2, 1}, {2, 2}, {1, 2}};
-  auto vertices_1 = bArray<double>::from_std(va_vertices_1);
-  auto vertices_2 = bArray<double>::from_std(va_vertices_2);
-  auto vertices_r = bArray<double>::from_std(va_vertices_r);
-  auto poly_1 = Poly(vertices_1);
-  auto poly_2 = Poly(vertices_2);
-  auto poly_r = Poly(vertices_r);
+auto make_poly = [](const std::vector<std::array<double, 2>>& va_vertices){
+  auto vertices = bArray<double>::from_std(va_vertices);
+  Wire border;
+  border.resize(vertices.size(0));
+  std::iota(border.begin(), border.end(), 0);
+  return Poly(vertices, border);
+};
+
+TEST_CASE("Polygon intersections", "[polygon]"){
+  std::vector<std::array<double, 2>> va_vertices_1, va_vertices_2, va_vertices_r;
+  double area_r{0};
+  SECTION("2x2 Square"){
+    va_vertices_1 = {{0, 0}, {2, 0}, {2, 2}, {0, 2}};
+
+    SECTION("Diagonal offset, corner intersection"){
+      va_vertices_2 = {{1, 1}, {3, 1}, {3, 3}, {1, 3}};
+      va_vertices_r = {{1, 1}, {2, 1}, {2, 2}, {1, 2}};
+      area_r = 1.0;
+    }
+    SECTION("Horizontal offset, edge intersection"){
+      va_vertices_2 = {{1, 0}, {3, 0}, {3, 2}, {1, 2}};
+      va_vertices_r = {{1, 0}, {2, 0}, {2, 2}, {1, 2}};
+      area_r = 2.0;
+    }
+    SECTION("Intersection at vertex is not a valid Polygon"){
+      va_vertices_2 = {{2, 2}, {4, 2}, {4, 4}, {2, 4}};
+    }
+    SECTION("Intersection along one edge is not a valid Polygon"){
+      va_vertices_2 = {{2, 1}, {4, 1}, {4, 3}, {2, 3}};
+    }
+    SECTION("No intersection"){
+      va_vertices_2 = {{3, 3}, {5, 3}, {5, 5}, {3, 5}};
+    }
+    SECTION("Pinch point"){
+      va_vertices_1 = {{0, 0}, {2, 0}, {2, 2}, {4, 2}, {4, 4}, {2, 4}, {2, 2}, {0, 2}};
+      va_vertices_2 = {{1, 1}, {3, 1}, {3, 3}, {1, 3}};
+      va_vertices_r = {{1, 1,}, {2, 1}, {2, 2}, {3, 2}, {3, 3}, {2, 3}, {2, 2}, {1, 2}};
+      area_r = 2.0;
+    }
+  }
+  auto poly_1 = make_poly(va_vertices_1);
+  auto poly_2 = make_poly(va_vertices_2);
   auto result = polygon_intersection(poly_1, poly_2);
-  REQUIRE(result.size() == 1u);
-  REQUIRE_THAT(result[0].area(), WithinRel(1., 1e-12));
-  REQUIRE(poly_r == result[0].without_extraneous_vertices());
+
+  if (area_r > 0){
+    auto poly_r = make_poly(va_vertices_r);
+    REQUIRE(result.size() == 1u);
+    REQUIRE_THAT(result[0].area(), WithinRel(poly_r.area(), 1e-12));
+    REQUIRE_THAT(result[0].area(), WithinRel(area_r, 1e-12));
+    REQUIRE(poly_r == result[0].without_extraneous_vertices());
+  } else {
+    REQUIRE(result.empty());
+  }
+
 }
+
+
+/* Test case written for pinch-point intersection, which results in only one valid intersection polygon! */
+//TEST_CASE("Multiple polygon intersections", "[polygon]"){
+//  std::vector<std::array<double, 2>> va_vertices_1, va_vertices_2;
+//  std::vector<std::vector<std::array<double, 2>>> va_vertices_r;
+//  std::vector<double> area_r;
+//  SECTION("Pinch point"){
+//    va_vertices_1 = {{0, 0}, {2, 0}, {2, 2}, {4, 2}, {4, 4}, {2, 4}, {2, 2}, {0, 2}};
+//    va_vertices_2 = {{1, 1}, {3, 1}, {3, 3}, {1, 3}};
+//    va_vertices_r = {{{1, 1}, {2, 1}, {2, 2}, {1, 2}}, {{2, 2}, {3, 2}, {3, 3}, {2, 3}}};
+//    area_r = {1.0, 1.0};
+//  }
+//  auto poly_1 = make_poly(va_vertices_1);
+//  auto poly_2 = make_poly(va_vertices_2);
+//
+//  auto result = polygon_intersection(poly_1, poly_2);
+//
+//  if (area_r.empty()){
+//    REQUIRE(result.empty());
+//  } else {
+//    std::vector<Poly<double, polystar::Array2>> polys_r;
+//    polys_r.reserve(va_vertices_r.size());
+//    for (const auto& va_vertices : va_vertices_r){
+//      polys_r.push_back(make_poly(va_vertices));
+//    }
+//
+//    REQUIRE(result.size() == va_vertices_r.size());
+//    for (size_t i=0; i<result.size(); ++i) {
+//      std::cout << result[i].without_extraneous_vertices() << "\n" << polys_r[i] << '\n';
+//    }
+//    for (size_t i=0; i<result.size(); ++i){
+//      REQUIRE_THAT(result[i].area(), WithinRel(polys_r[i].area(), 1e-12));
+//      REQUIRE_THAT(result[i].area(), WithinRel(area_r[i], 1e-12));
+//      REQUIRE(polys_r[i] == result[i].without_extraneous_vertices());
+//    }
+//  }
+//}

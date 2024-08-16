@@ -491,6 +491,7 @@ namespace polystar::polygon{
     // Construct the dual doubly-linked lists of vertex indices
     auto lists = clip::VertexLists(new_wa, new_wb);
     v = clip::weiler_atherton(v, lists);
+//    std::cout << "Result of Weiler-Atherton, vertices:\n" << v.to_string() << "lists:\n" << lists << "\n";
     auto wires = lists.union_wires();
     // the union wires returned vector is {border, hole0, hole1, ...}
     std::vector<Poly<T, A>> result;

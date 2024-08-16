@@ -3,7 +3,6 @@
 using namespace polystar::polygon;
 using namespace polystar::polygon::clip;
 
-
 std::vector<Wire> VertexLists::intersection_wires() const {
   std::vector<Wire> combined;
   if (A.is_empty() && B.is_empty()) return combined;
@@ -17,46 +16,53 @@ std::vector<Wire> VertexLists::intersection_wires() const {
   // Walk around wire A, looking for an intersection with wire B that is pointing into A
   auto v = A.first();
   auto first_start = v;
+  On on = On::A;
+  Wire wire;
+  bool recording{false};
+  bool started{false};
+  auto start = v;
   do {
-    if (!v->visited() && v->type() == Type::entry){
-//      std::cout << "Enter wire at " << v << "\n";
-      // We have found an intersection point, now walk around wire A until we find the exit point
-      Wire wire;
-      auto start = v;
-      do {
-        v->visited(true);
-        wire.push_back(v->value());
-        v = v->next(On::A);
-      } while (v != start && v->type() != Type::exit);
-      // ensure the exit point gets added to the wire:
-      if (v->type() == Type::exit){
-        wire.push_back(v->value());
+    // With a latch on whether this is the 'first' go-round, if we return to the start, this polygon is done
+    if (started && v == start) {
+      recording = false;
+      if (!wire.empty()) {
+        // std::cout << "Resulting wire is: [ ";
+        // for (const auto & w: wire) std::cout << w << ", ";
+        // std::cout << "]\n";
+
+        combined.push_back(wire);
+        wire = Wire();
+      } else {
+        // we're stuck in a loop -- punt by returning to the start?
+        started=false;
+        start = first_start;
+        on = On::A;
+        v = first_start;
       }
-//      std::cout << "Exit wire at " << v << "\n";
-      // If we found the exit point, keep walking around B until we find the entry point again
-      if (v != start) {
-        v = v->next(On::B);
-        while (v != start){
-          v->visited(true);
-          wire.push_back(v->value());
-          v = v->next(On::B);
-        }
-      }
-//      std::cout << "Resulting wire is: [ ";
-//      for (const auto & w: wire) std::cout << w << ", ";
-//      std::cout << "]\n";
-      combined.push_back(wire);
     }
-    // Record that we visited the point, even if it wasn't an entry
+    //
+    if (!recording && !v->visited() && v->type() == Type::entry) {
+      // std::cout << "Enter wire at " << v << "\n";
+      // We have found an intersection point, now walk around wire A until we find the exit point
+      start = v;
+      recording = true;
+      started=true;
+    }
+    if (recording) {
+      // only switch between wires if we're following a valid intersection boundary
+      if (v->type() == Type::entry) on = On::A;
+      if (v->type() == Type::exit) on = On::B;
+      // record the vertex index
+      // sstd::cout << "Recording " << v << "\n";
+      wire.push_back(v->value());
+    }
     v->visited(true);
-    // Step to the next on A
-    v = v->next(On::A);
-    // If it has been visited, fast-forward over it
-    while (v->visited() && v != first_start) v = v->next(On::A);
+    v = v->next(on);
   } while (v != first_start);
 
   return combined;
 }
+
 
 std::vector<Wire> VertexLists::union_wires() const {
   std::vector<Wire> combined;
@@ -65,6 +71,8 @@ std::vector<Wire> VertexLists::union_wires() const {
   if (B.is_empty()) return {A.wire(On::A)};
   // Use the Weiler-Atherton algorithm to combine the two wires
   // https://en.wikipedia.org/wiki/Weiler%E2%80%93Atherton_clipping_algorithm
+
+  // FIXME As with intersections, there can be a closed loop that does not revisit the start vertex
 
   // Walk around wire B, looking for an intersection with wire A that is pointing into A
   auto v = B.first();
