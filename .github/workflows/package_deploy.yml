@@ -51,7 +51,7 @@ jobs:
         python-version: 3.8
       if: runner.os == 'macOS' && runner.arch == 'ARM64'
 
-    - uses: pypa/cibuildwheel@v2.19.2
+    - uses: pypa/cibuildwheel@v2.20.0
       env:
         CIBW_BUILD: "*-${{ matrix.variant.platform }}*"
         MACOSX_DEPLOYMENT_TARGET: "10.15"
