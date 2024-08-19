@@ -7,6 +7,7 @@
 #include <optional>
 #include "graph.hpp"
 #include "svg.hpp"
+#include "geometry.hpp"
 
 namespace polystar::polygon {
   template<class W, class T, template<class> class A>

@@ -1108,11 +1108,14 @@ namespace polystar {
     return true;
   }
 
-  /* \brief Find the intersection of two line segments
+  /** \brief Find the intersection of two line segments
    *
    * An intersection point exists if the two line segments are not parallel. That intersection point is 'valid' if
    * it is within *both* line segments.
    *
+   * \note
+   * The inclusivity refers to the end points of the `first` or `second` **edge**, not the first or second point on
+   * one of the edges!
    * */
   enum class end_type {both, first, second, neither};
 
@@ -1140,10 +1143,15 @@ namespace polystar {
           auto t0 = static_cast<double>(dot(qp, r).val(0,0)) / r2;
           auto sr = static_cast<double>(dot(s, r).val(0,0));
           auto t1 = t0 + sr / r2;
-          if (sr < 0) std::swap(t0, t1);
+          if (sr < 0) {
+            std::swap(t0, t1);
+            std::swap(lok, rok);
+          }
           auto st0{std::sqrt(t0)};
           auto st1{std::sqrt(t1)};
-          bool inside{(0 < t0 && t1 < 1 && t0 < t1) || (lok && (0 < t0 && t0 < 1 && t1 == 1))};
+          // the second edge is inside the first edge
+          bool inside{(0 < t0 && t1 < 1 && t0 < t1) || (lok && (0 <= t0 && t1 <= 1 && t0 < t1))};
+          // the first edge is inside the second edge
           bool outside{(t0 < 0 && t1 > 1) || (rok && (t0 <= 0 && t1 >= 1))};
           if (inside || outside) {
             // collinear *and* overlap

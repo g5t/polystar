@@ -85,8 +85,8 @@ void define_polygon(py::class_<A> & cls){
 // overloaded operations:
   cls.def("__eq__", [](const A& p, const A& o){return p == o;});
   cls.def("__neq__", [](const A& p, const A& o){return p != o;});
-  cls.def("__add__", [](const A& p, const A& o){return p + o;});
-  cls.def("__add__", [](const A& p, const std::vector<A> & v){return p.combine_all(v);});
+//  cls.def("__add__", [](const A& p, const A& o){return p + o;});
+//  cls.def("__add__", [](const A& p, const std::vector<A> & v){return p.combine_all(v);});
 
 }
 //
