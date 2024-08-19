@@ -24,25 +24,26 @@ std::vector<Wire> VertexLists::intersection_wires() const {
   do {
     // With a latch on whether this is the 'first' go-round, if we return to the start, this polygon is done
     if (started && v == start) {
+      // stop recording
       recording = false;
+      // go back to A, no matter what
+      on = On::A;
       if (!wire.empty()) {
-        // std::cout << "Resulting wire is: [ ";
-        // for (const auto & w: wire) std::cout << w << ", ";
-        // std::cout << "]\n";
-
+//        std::cout << "Resulting wire is: [ ";
+//        for (const auto & w: wire) std::cout << w << ", ";
+//        std::cout << "]\n";
         combined.push_back(wire);
         wire = Wire();
       } else {
         // we're stuck in a loop -- punt by returning to the start?
-        started=false;
+        started = false;
         start = first_start;
-        on = On::A;
         v = first_start;
       }
     }
     //
-    if (!recording && !v->visited() && v->type() == Type::entry) {
-      // std::cout << "Enter wire at " << v << "\n";
+    if (!recording && !v->visited() && v->vertex_type() == Type::entry) {
+//      std::cout << "Enter wire at " << v << "\n";
       // We have found an intersection point, now walk around wire A until we find the exit point
       start = v;
       recording = true;
@@ -50,15 +51,21 @@ std::vector<Wire> VertexLists::intersection_wires() const {
     }
     if (recording) {
       // only switch between wires if we're following a valid intersection boundary
-      if (v->type() == Type::entry) on = On::A;
-      if (v->type() == Type::exit) on = On::B;
-      // record the vertex index
-      // sstd::cout << "Recording " << v << "\n";
-      wire.push_back(v->value());
+      if (!v->visited() && v->vertex_type() == Type::entry) on = On::A;
+      if (!v->visited() && v->vertex_type() == Type::exit) on = On::B;
+      // record the vertex index, protecting against repeated indexes
+      // (from input-polygon vertices also being intersection points)
+      if (wire.empty() || wire.back() != v->value()) {
+//        std::cout << "Recording " << v << "\n";
+        wire.push_back(v->value());
+      }
+      v->visited(true);
+//    } else {
+//      std::cout << "Passed " << v << "\n";
     }
-    v->visited(true);
+
     v = v->next(on);
-  } while (v != first_start);
+  } while (recording || v != first_start);
 
   return combined;
 }
@@ -81,8 +88,8 @@ std::vector<Wire> VertexLists::union_wires() const {
   do {
     v->visited(true);
     wire.push_back(v->value());
-    if (v->type() == Type::entry) on = On::A;
-    else if (v->type() == Type::exit) on = On::B;
+    if (v->vertex_type() == Type::entry) on = On::A;
+    else if (v->vertex_type() == Type::exit) on = On::B;
     v = v->next(on);
   } while (!v->visited() && v != B.first());
   combined.push_back(wire);
@@ -90,14 +97,14 @@ std::vector<Wire> VertexLists::union_wires() const {
   // Walk around wire B again, looking for unvisited intersection vertices (which should be holes)
   v = B.first();
   do {
-    if (v->type() == Type::entry && !v->visited()){
+    if (v->vertex_type() == Type::entry && !v->visited()){
       Wire hole;
       auto start = v;
       do {
         v->visited(true);
         hole.push_back(v->value());
         v = v->prev(On::B);
-      } while (v != start && v->type() != Type::exit);
+      } while (v != start && v->vertex_type() != Type::exit);
       if (v != start) {
         v = v->prev(On::A);
         while (v != start){

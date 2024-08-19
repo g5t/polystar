@@ -208,39 +208,63 @@ TEST_CASE("Polygon intersections", "[polygon]"){
 }
 
 
-/* Test case written for pinch-point intersection, which results in only one valid intersection polygon! */
-//TEST_CASE("Multiple polygon intersections", "[polygon]"){
-//  std::vector<std::array<double, 2>> va_vertices_1, va_vertices_2;
-//  std::vector<std::vector<std::array<double, 2>>> va_vertices_r;
-//  std::vector<double> area_r;
-//  SECTION("Pinch point"){
-//    va_vertices_1 = {{0, 0}, {2, 0}, {2, 2}, {4, 2}, {4, 4}, {2, 4}, {2, 2}, {0, 2}};
-//    va_vertices_2 = {{1, 1}, {3, 1}, {3, 3}, {1, 3}};
-//    va_vertices_r = {{{1, 1}, {2, 1}, {2, 2}, {1, 2}}, {{2, 2}, {3, 2}, {3, 3}, {2, 3}}};
-//    area_r = {1.0, 1.0};
-//  }
-//  auto poly_1 = make_poly(va_vertices_1);
-//  auto poly_2 = make_poly(va_vertices_2);
-//
-//  auto result = polygon_intersection(poly_1, poly_2);
-//
-//  if (area_r.empty()){
-//    REQUIRE(result.empty());
-//  } else {
-//    std::vector<Poly<double, polystar::Array2>> polys_r;
-//    polys_r.reserve(va_vertices_r.size());
-//    for (const auto& va_vertices : va_vertices_r){
-//      polys_r.push_back(make_poly(va_vertices));
-//    }
-//
-//    REQUIRE(result.size() == va_vertices_r.size());
-//    for (size_t i=0; i<result.size(); ++i) {
-//      std::cout << result[i].without_extraneous_vertices() << "\n" << polys_r[i] << '\n';
-//    }
-//    for (size_t i=0; i<result.size(); ++i){
-//      REQUIRE_THAT(result[i].area(), WithinRel(polys_r[i].area(), 1e-12));
-//      REQUIRE_THAT(result[i].area(), WithinRel(area_r[i], 1e-12));
-//      REQUIRE(polys_r[i] == result[i].without_extraneous_vertices());
-//    }
-//  }
-//}
+TEST_CASE("Multiple polygon intersections", "[polygon]"){
+  auto perform_tests = [](auto va1, auto va2, auto var, auto ar){
+    auto p1 = make_poly(va1);
+    auto p2 = make_poly(va2);
+    auto rs = polygon_intersection(p1, p2);
+    if (ar.empty()){
+      REQUIRE(rs.empty());
+    } else {
+      std::vector<Poly<double, polystar::Array2>> polys_r;
+      polys_r.reserve(var.size());
+      for (const auto& va_vertices : var){
+        polys_r.push_back(make_poly(va_vertices));
+      }
+      // std::cout << rs.size() << " results: \n";
+      // for (const auto & r: rs) std::cout << r.without_extraneous_vertices() << "\n\n";
+      REQUIRE(rs.size() == var.size());
+      for (size_t i=0; i<rs.size(); ++i){
+        REQUIRE_THAT(rs[i].area(), WithinRel(polys_r[i].area(), 1e-12));
+        REQUIRE_THAT(rs[i].area(), WithinRel(ar[i], 1e-12));
+        REQUIRE(polys_r[i] == rs[i].without_extraneous_vertices());
+      }
+    }
+  };
+
+  std::vector<std::array<double, 2>> va_vertices_1, va_vertices_2;
+  std::vector<std::vector<std::array<double, 2>>> va_vertices_r;
+  std::vector<double> area_r;
+
+  SECTION("Forked"){
+    va_vertices_1 = {{0, 0}, {3, 0}, {3, 4}, {0, 4}};
+    va_vertices_2 = {{2, 1}, {5, 1}, {5, 3}, {2, 3}, {4, 2}};
+    va_vertices_r = {
+        {{2, 1}, {3, 1}, {3, 1.5}},
+        {{2, 3}, {3, 2.5}, {3, 3}},
+    };
+    area_r = {0.25, 0.25};
+    perform_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+  }
+  SECTION("Inverted big G and rectangle"){
+    va_vertices_1 = {{5, 5}, {8, 5}, {8, 3}, {7, 1}, {3, 1}, {2, 3}, {2, 8},
+                     {3, 9}, {7, 9}, {8, 8}, {8, 7}, {7, 7}, {6, 8}, {4, 8},
+                     {3, 7}, {3, 3}, {4, 2}, {6, 2}, {7, 3}, {7, 4}, {5, 4}};
+    va_vertices_2 = {{4, 3}, {6, 3}, {6, 10}, {4, 10}};
+    va_vertices_r = {{{4, 9}, {6, 9}, {6, 10}, {4, 10}},
+                     {{6, 8}, {4, 8}, {4, 3}, {6, 3}, {6, 4}, {5 ,4}, {5, 5}, {6, 5}}};
+    area_r = {2.0, 9.0};
+    perform_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+  }
+  SECTION("Big G and rectangle"){
+    va_vertices_1 = {{5, 5}, {5, 4}, {7, 4}, {7, 3}, {6, 2}, {4, 2}, {3, 3},
+                     {3, 7}, {4, 8}, {6, 8}, {7, 7}, {8, 7}, {8, 8}, {7, 9},
+                     {3, 9}, {2, 8}, {2, 3}, {3, 1}, {7, 1}, {8, 3}, {8, 5}};
+    va_vertices_2 = {{4, 3}, {6, 3}, {6, 10}, {4, 10}};
+    va_vertices_r = {{{4, 8}, {6, 8}, {6, 9}, {4, 9}},
+                     {{6, 5}, {5, 5}, {5, 4}, {6, 4}}};
+    area_r = {2.0, 1.0};
+    perform_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+  }
+
+}

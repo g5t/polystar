@@ -40,7 +40,7 @@ namespace polystar::polygon::clip
       : _value(i), _type(type), prev_A(prev_A), next_A(next_A), prev_B(prev_B), next_B(next_B) {}
 
     [[nodiscard]] ind_t value() const { return _value; }
-    [[nodiscard]] Type type() const { return _type; }
+    [[nodiscard]] Type vertex_type() const { return _type; }
     [[nodiscard]] bool visited() const { return _visited; }
     void visited(bool v) { _visited = v; }
 
@@ -60,14 +60,14 @@ namespace polystar::polygon::clip
       // step to the next ptr on A or B
       auto n = next_on(on);
       // if we take any type, or this one happens to be what we want, return it
-      if (Type::unknown == type || n->type() == type) return n;
+      if (Type::unknown == type || n->vertex_type() == type) return n;
       // keep a reference to know where we started
       auto stop = n;
       do {
         // get the next ptr on A or B
         n = n->next_on(on);
         // return it if it's the right type
-        if (n->type() == type) return n;
+        if (n->vertex_type() == type) return n;
         // continue until we get a nullptr or back to where we started
       } while (n != nullptr && n != stop);
       return nullptr;
@@ -76,14 +76,14 @@ namespace polystar::polygon::clip
       // step to the prev ptr on A or B
       auto n = prev_on(on);
       // if we take any type, or this one happens to be what we want, return it
-      if (Type::unknown == type || n->type() == type) return n;
+      if (Type::unknown == type || n->vertex_type() == type) return n;
       // keep a reference to know where we started
       auto stop = n;
       do {
         // get the next ptr on A or B
         n = n->prev_on(on);
         // return it if it's the right type
-        if (n->type() == type) return n;
+        if (n->vertex_type() == type) return n;
         // continue until we get a nullptr or back to where we started
       } while (n != nullptr && n != stop);
       return nullptr;
@@ -94,7 +94,7 @@ namespace polystar::polygon::clip
       auto is_A = ptr->is_A();
       auto is_B = ptr->is_B();
       auto on = is_A && is_B ? On::both : is_A ? On::A : is_B ? On::B : On::neither;
-      os << ptr->value() << ":" << to_string(ptr->type()) << to_string(on);
+      os << ptr->value() << ":" << to_string(ptr->vertex_type()) << to_string(on);
       return os;
     }
 
@@ -190,6 +190,32 @@ namespace polystar::polygon::clip
     }
   };
 
+
+  template<class T, template<class> class A>
+  void insert(On on, const Vertex::ptr & from, std::pair<ind_t, ind_t> edge, const Vertex::ptr & point, A<T> & v){
+    auto first = v.view(edge.first);
+    auto vec = v.view(edge.second) - first;
+    vec /= norm(vec);
+    auto dist = dot(v.view(point->value()) - first, vec).sum();
+    auto p_dist = 0 * dist;
+    auto p = from;
+    do {
+      p = p->next(on);
+      p_dist = dot(v.view(p->value()) - first, vec).sum();
+    } while (p_dist < dist && p->value() != edge.second);
+    // p is now either the end of the edge (which must be farther from the start than insertion point is)
+    // or is the first point on the edge farther than the one to be inserted
+    // So insert the provided point between p's predecessor and p:
+    auto predecessor = p->prev(on);
+    // the inserted point links back to the predecessor, and forward to p
+    point->prev(on, predecessor);
+    point->next(on, p);
+    // p points back to the inserted point
+    p->prev(on, point);
+    // the predecessor points forward to the inserted point
+    predecessor->next(on, point);
+  }
+
   template<class T, template<class> class A>
   A<T> weiler_atherton(A<T> & v, VertexLists & lists){
     // Walk through both lists of vertices, looking for intersections
@@ -259,12 +285,8 @@ namespace polystar::polygon::clip
 
           //  3. Insert it into the doubly-linked lists of vertices on both A and B
           auto ptr = std::make_shared<clip::Vertex>(index, type);
-          ptr->prev(clip::On::A, ptr_a);
-          ptr->next(clip::On::A, ptr_a->next(clip::On::A));
-          ptr->prev(clip::On::B, ptr_b);
-          ptr->next(clip::On::B, ptr_b->next(clip::On::B));
-          ptr_a->next(clip::On::A, ptr);
-          ptr_b->next(clip::On::B, ptr);
+          insert(clip::On::A, ptr_a, edge_a, ptr, v);
+          insert(clip::On::B, ptr_b, edge_b, ptr, v);
         }
         // move to the next original wire vertex on B
         ptr_b = ptr_b->next(clip::On::B, clip::Type::original);
