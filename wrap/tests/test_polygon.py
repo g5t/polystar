@@ -91,6 +91,24 @@ class PolygonTestCase(TestCase):
         self.assertTrue(allclose(v_stride, v_array))
         self.memory_layout_checks(v_stride, border, area)
 
+    def test_found_intersection_error(self):
+        from polystar import Polygon
+        base = Polygon([[0.   , 0.001], [0.   , 0.013], [0.01 , 0.013], [0.01 , 0.001]])
+        reg0 = Polygon([[ 0.02 ,  0.001], [-0.1  ,  0.013], [-0.15 ,  0.013], [-0.03 ,  0.001]])
+        reg1 = Polygon([[ 1.2e-01,  1.0e-03], [ 2.77555756e-17,  1.3e-02], [-5.0e-02,  1.3e-02], [ 7.0e-02,  1.0e-03]])
+
+        exp0 = Polygon([[0.01, 0.002], [0.  , 0.003], [0.  , 0.001], [0.01, 0.001]])
+        exp1 = Polygon([[0.  , 0.013], [0.  , 0.008], [0.01, 0.007], [0.01, 0.012]])
+
+        pb0 = base.intersection(reg0)
+        pb1 = base.intersection(reg1)
+        p0b = reg0.intersection(base)
+        p1b = reg1.intersection(base)
+
+        self.assertEqual(pb0, p0b)
+        self.assertEqual(pb1, p1b)
+        self.assertEqual(exp0, pb0)
+        self.assertEqual(exp1, pb1)
 
 if __name__ == '__main__':
     import unittest

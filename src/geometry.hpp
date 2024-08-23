@@ -1147,16 +1147,16 @@ namespace polystar {
             std::swap(t0, t1);
             std::swap(lok, rok);
           }
-          auto st0{std::sqrt(t0)};
-          auto st1{std::sqrt(t1)};
+//          auto st0{std::sqrt(t0)};
+//          auto st1{std::sqrt(t1)};
           // the second edge is inside the first edge
           bool inside{(0 < t0 && t1 < 1 && t0 < t1) || (lok && (0 <= t0 && t1 <= 1 && t0 < t1))};
           // the first edge is inside the second edge
           bool outside{(t0 < 0 && t1 > 1) || (rok && (t0 <= 0 && t1 >= 1))};
           if (inside || outside) {
             // collinear *and* overlap
-            auto x0 = t0 <= 0 ? p : A<T>(p + st0 * r);
-            auto x1 = t1 >= 1 ? p + r : A<T>(p + st1 * r);
+            auto x0 = t0 <= 0 ? p : A<T>(p + t0 * r);     // why was this p + st0 * r?
+            auto x1 = t1 >= 1 ? p + r : A<T>(p + t1 * r); // why was this p + st1 * r?
             return std::make_pair(2u, cat(0, x0, x1));
           }
         }

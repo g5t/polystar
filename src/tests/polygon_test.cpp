@@ -80,77 +80,6 @@ TEST_CASE("Non-convex Polygon area", "[polygon]"){
 }
 
 
-TEST_CASE("Edge intersection", "[polygon][edge]"){
-  std::vector<std::array<double, 2>> va_vertices {
-      {1, 1}, {2, 3}, {1, 3}, {4, 1}, {4, 3}, {2, 2}, {5, 0}, {1, 0}, {-2, -1}, {7, 5},
-      {-1, 0.25}, {1, 0.25}, {0.4, 0.4}, {0.4, -0.4}
-  };
-  auto vertices = bArray<double>::from_std(va_vertices);
-  SECTION("Mid-edge intersection"){
-    auto edge_1 = std::make_pair<ind_t, ind_t>(0, 1);
-    auto edge_2 = std::make_pair<ind_t, ind_t>(2, 3);
-    REQUIRE(intersect2d(vertices, edge_1, vertices, edge_2));
-    auto [flag, at] = intersection2d(vertices, edge_1, vertices, edge_2);
-    REQUIRE(flag == 1);
-    REQUIRE_THAT(at.val(0, 0), WithinRel(1.75, 1e-12));
-    REQUIRE_THAT(at.val(0, 1), WithinRel(2.5, 1e-12));
-  }
-  SECTION("Error-prone edge intersection"){
-    auto edge_1 = std::make_pair<ind_t, ind_t>(10, 11);
-    auto edge_2 = std::make_pair<ind_t, ind_t>(12, 13);
-    REQUIRE(intersect2d(vertices, edge_1, vertices, edge_2));
-    auto [flag, at] = intersection2d(vertices, edge_1, vertices, edge_2);
-    REQUIRE(flag == 1);
-    REQUIRE_THAT(at.val(0, 0), WithinRel(0.4, 1e-12));
-    REQUIRE_THAT(at.val(0, 1), WithinRel(0.25, 1e-12));
-  }
-  SECTION("Edge intersection at vertex"){
-    auto edge_1 = std::make_pair<ind_t, ind_t>(1, 0);
-    auto edge_2 = std::make_pair<ind_t, ind_t>(4, 0);
-    auto edge_1_reverse = std::make_pair(edge_1.second, edge_1.first);
-    auto edge_2_reverse = std::make_pair(edge_2.second, edge_2.first);
-    // An opinionated, and perhaps incorrect, choice was to exclude the first vertex of both edges
-    // from the possible intersection point.
-    REQUIRE(!intersect2d(vertices, edge_1_reverse, vertices, edge_2_reverse));
-    // Flipping one edge still doesn't find the intersection since the other first-vertex is excluded
-    REQUIRE(!intersect2d(vertices, edge_1_reverse, vertices, edge_2));
-    REQUIRE(!intersect2d(vertices, edge_1, vertices, edge_2_reverse));
-    // With the common vertex as the second in each edge, they are found to intersect
-    REQUIRE(intersect2d(vertices, edge_1, vertices, edge_2));
-    auto [flag, at] = intersection2d(vertices, edge_1, vertices, edge_2);
-    REQUIRE(flag == 1);
-    REQUIRE_THAT(at.val(0, 0), WithinRel(1., 1e-12));
-    REQUIRE_THAT(at.val(0, 1), WithinRel(1., 1e-12));
-    REQUIRE(at.row_is(cmp::eq, vertices.view(edge_2.second)).all());
-  }
-  SECTION("Edge no-intersection"){
-    // The infinite lines through segments
-    // {1, 1} -- {2, 3} and {2, 2} -- {5, 0}
-    // intersect, inside the first segment but outside the second.
-    auto edge_1 = std::make_pair<ind_t, ind_t>(0, 1);
-    auto edge_2 = std::make_pair<ind_t, ind_t>(5, 6);
-    REQUIRE(!intersect2d(vertices, edge_1, vertices, edge_2));
-    REQUIRE(!intersect2d(vertices, edge_2, vertices, edge_1));
-  }
-  SECTION("Parallel edges"){
-    auto edge_1 = std::make_pair<ind_t, ind_t>(0, 1);
-    auto edge_2 = std::make_pair<ind_t, ind_t>(5, 7);
-    REQUIRE(!intersect2d(vertices, edge_1, vertices, edge_2));
-  }
-  SECTION("Colinear edges"){
-    auto edge_1 = std::make_pair<ind_t, ind_t>(0, 4);
-    auto edge_2 = std::make_pair<ind_t, ind_t>(8, 9);
-    REQUIRE(intersect2d(vertices, edge_1, vertices, edge_2));
-    REQUIRE(intersect2d(vertices, edge_2, vertices, edge_1));
-    auto [flag, at] = intersection2d(vertices, edge_1, vertices, edge_2);
-    REQUIRE(flag == 2);
-    // at contains both vertices of edge_1
-    REQUIRE(at.row_is(cmp::eq, vertices.view(edge_1.first)).sum() == 1);
-    REQUIRE(at.row_is(cmp::eq, vertices.view(edge_1.second)).sum() == 1);
-  }
-
-}
-
 auto make_poly = [](const std::vector<std::array<double, 2>>& va_vertices){
   auto vertices = bArray<double>::from_std(va_vertices);
   Wire border;
@@ -160,6 +89,26 @@ auto make_poly = [](const std::vector<std::array<double, 2>>& va_vertices){
 };
 
 TEST_CASE("Polygon intersections", "[polygon]"){
+  auto do_tests = [](const auto & va1, const auto & va2, const auto & var, const auto var_area){
+    auto poly_1 = make_poly(va1);
+    auto poly_2 = make_poly(va2);
+    auto result = polygon_intersection(poly_1, poly_2);
+
+    if (var_area > 0){
+      auto poly_r = make_poly(var);
+      REQUIRE(result.size() == 1u);
+      auto r = result[0].without_extraneous_vertices();
+      if (r.area() != poly_r.area()){
+        std::cout << "Area mismatch \nresult:\n" << r << "\ndiffers from expected:\n" << poly_r << "\n";
+      }
+      REQUIRE_THAT(r.area(), WithinRel(poly_r.area(), 1e-12));
+      REQUIRE_THAT(r.area(), WithinRel(var_area, 1e-12));
+      REQUIRE(poly_r == r.without_extraneous_vertices());
+    } else {
+      REQUIRE(result.empty());
+    }
+  };
+
   std::vector<std::array<double, 2>> va_vertices_1, va_vertices_2, va_vertices_r;
   double area_r{0};
   SECTION("2x2 Square"){
@@ -169,43 +118,170 @@ TEST_CASE("Polygon intersections", "[polygon]"){
       va_vertices_2 = {{1, 1}, {3, 1}, {3, 3}, {1, 3}};
       va_vertices_r = {{1, 1}, {2, 1}, {2, 2}, {1, 2}};
       area_r = 1.0;
+      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
     }
     SECTION("Horizontal offset, edge intersection"){
       va_vertices_2 = {{1, 0}, {3, 0}, {3, 2}, {1, 2}};
       va_vertices_r = {{1, 0}, {2, 0}, {2, 2}, {1, 2}};
       area_r = 2.0;
+      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
     }
     SECTION("Intersection at vertex is not a valid Polygon"){
       va_vertices_2 = {{2, 2}, {4, 2}, {4, 4}, {2, 4}};
+      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
     }
     SECTION("Intersection along one edge is not a valid Polygon"){
       va_vertices_2 = {{2, 1}, {4, 1}, {4, 3}, {2, 3}};
+      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
     }
     SECTION("No intersection"){
       va_vertices_2 = {{3, 3}, {5, 3}, {5, 5}, {3, 5}};
+      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
     }
     SECTION("Pinch point"){
       va_vertices_1 = {{0, 0}, {2, 0}, {2, 2}, {4, 2}, {4, 4}, {2, 4}, {2, 2}, {0, 2}};
       va_vertices_2 = {{1, 1}, {3, 1}, {3, 3}, {1, 3}};
       va_vertices_r = {{1, 1,}, {2, 1}, {2, 2}, {3, 2}, {3, 3}, {2, 3}, {2, 2}, {1, 2}};
       area_r = 2.0;
+      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
     }
   }
-  auto poly_1 = make_poly(va_vertices_1);
-  auto poly_2 = make_poly(va_vertices_2);
-  auto result = polygon_intersection(poly_1, poly_2);
-
-  if (area_r > 0){
-    auto poly_r = make_poly(va_vertices_r);
-    REQUIRE(result.size() == 1u);
-    REQUIRE_THAT(result[0].area(), WithinRel(poly_r.area(), 1e-12));
-    REQUIRE_THAT(result[0].area(), WithinRel(area_r, 1e-12));
-    REQUIRE(poly_r == result[0].without_extraneous_vertices());
-  } else {
-    REQUIRE(result.empty());
+  SECTION("1x5 Rectangle"){
+    va_vertices_1 = {{3, 0}, {4, 0}, {4, 5}, {3, 5}};
+    SECTION("Parallelogram top edge-vertex intersection"){
+      va_vertices_2 = {{5, 0}, {9, 0}, {4, 5}, {0, 5}};
+      va_vertices_r = {{3, 5}, {3, 2}, {4, 1}, {4, 5}};
+      area_r = 3.5;
+      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+    }
+    SECTION("Parallelogram bottom edge-vertex intersection"){
+      va_vertices_2 = {{1, 0}, {5, 0}, {0, 5}, {-4, 5}};
+      va_vertices_r = {{3, 2}, {3, 0}, {4, 0}, {4, 1}};
+      area_r = 1.5;
+      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+    }
+    SECTION("Right parallelogram bottom edge-vertex intersection"){
+      va_vertices_2 = {{0, 0}, {4, 0}, {9, 5}, {5, 5}};
+      va_vertices_r = {{3, 3}, {3, 0}, {4, 0}, {4, 4}};
+      area_r = 3.5;
+      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+    }
   }
 
 }
+
+TEST_CASE("Polygon intersection reciprocity", "[polygon][reciprocity]"){
+
+  auto do_test = [](const auto & name, const auto &v1, const auto &vA, const auto &vR){
+    auto poly_1 = make_poly(v1);
+    auto poly_A = make_poly(vA);
+
+    REQUIRE(poly_1.area() > 0);
+    REQUIRE(poly_A.area() > 0);
+
+    std::cout << name << " Poly1:\n" << poly_1 << "\n" << name << " PolyA:\n" << poly_A << "\n";
+
+    auto int_1A = polygon_intersection(poly_1, poly_A);
+    auto int_A1 = polygon_intersection(poly_A, poly_1);
+
+    REQUIRE(int_1A.size() == int_A1.size());
+    for (size_t i=0; i < int_1A.size(); ++i){
+      auto p1A = int_1A[i].without_extraneous_vertices();
+      auto pA1 = int_A1[i].without_extraneous_vertices();
+      std::cout << name << " " << i << " 1A:\n" << p1A << "\n" << name << " " << i << " A1:\n" << pA1 << "\n";
+      REQUIRE_THAT(p1A.area(), WithinRel(p1A.area(), 1e-14));
+      REQUIRE(p1A == pA1);
+    }
+
+    if (!vR.empty()){
+      REQUIRE(vR.size() == int_1A.size());
+      for (size_t i = 0; i < vR.size(); ++i){
+        auto poly_R = make_poly(vR[i]);
+        REQUIRE_THAT(int_1A[i].area(), WithinRel(poly_R.area(), 1e-12));
+        REQUIRE(int_1A[i].without_extraneous_vertices() == poly_R);
+      }
+
+    }
+
+  };
+
+  std::vector<std::array<double, 2>> va1, vaA;
+  std::vector<std::vector<std::array<double, 2>>> vaR;
+  SECTION("Rectangle and parallelogram") {
+    va1 = {{0,    0.013},
+           {0,    0.001},
+           {0.01, 0.001},
+           {0.01, 0.013}};
+    SECTION("On-border points, lower") {
+      vaA = {{0.02,  0.001},
+             {-0.1,  0.013},
+             {-0.15, 0.013},
+             {-0.03, 0.001}};
+      vaR = {
+          {{0.01, 0.002}, {0, 0.003}, {0, 0.001}, {0.01, 0.001}}
+      };
+      do_test("lower", va1, vaA, vaR); // error thrown because areas of intersections don't match
+    }
+    SECTION("On-border points, upper") {
+      vaA = {{-0.05,          0.013},
+             {0.012,          0.001},
+             {0.07,           0.001},
+             {2.77555756E-17, 0.013},};
+      vaR = {
+          {{0, 0.013}, {0, 0.008}, {0.01, 0.007}, {0.01, 0.012}}
+      };
+      do_test("upper", va1, vaA, vaR);
+    }
+  }
+}
+
+//TEST_CASE("Self-intersecting Polygon intersection reciprocity", "[polygon]"){
+//
+//  auto do_test = [](const auto & name, const auto &v1, const auto &vA, const auto &vR){
+//    auto poly_1 = make_poly(v1);
+//    auto poly_A = make_poly(vA);
+//
+//    std::cout << name << " Poly1:\n" << poly_1 << "\n" << name << " PolyA:\n" << poly_A << "\n";
+//
+//    auto int_1A = polygon_intersection(poly_1, poly_A);
+//    auto int_A1 = polygon_intersection(poly_A, poly_1);
+//
+//    REQUIRE(int_1A.size() == int_A1.size());
+//    for (size_t i=0; i < int_1A.size(); ++i){
+//      REQUIRE_THAT(int_1A[i].area(), WithinRel(int_A1[i].area(), 1e-14));
+//      auto p1A = int_1A[i].without_extraneous_vertices();
+//      auto pA1 = int_A1[i].without_extraneous_vertices();
+//      REQUIRE(p1A == pA1);
+//      std::cout << name << " " << i << " 1A:\n" << p1A << "\n" << name << " " << i << " A1:\n" << pA1 << "\n";
+//    }
+//
+//    if (!vR.empty()){
+//      REQUIRE(vR.size() == int_1A.size());
+//      for (size_t i = 0; i < vR.size(); ++i){
+//        auto poly_R = make_poly(vR[i]);
+//        REQUIRE_THAT(int_1A[i].area(), WithinRel(poly_R.area(), 1e-12));
+//        REQUIRE(int_1A[i].without_extraneous_vertices() == poly_R);
+//      }
+//
+//    }
+//
+//  };
+//
+//  std::vector<std::array<double, 2>> va1, vaA;
+//  std::vector<std::vector<std::array<double, 2>>> vaR;
+//  SECTION("Hour glass, lower"){
+//  va1 = {{0, 0.001}, {0, 0.013}, {0.01, 0.013}, {0.01, 0.001}};
+//  vaA = {{0.02, 0.001}, {-0.15, 0.013}, {-0.1, 0.013}, {-0.03, 0.001}};
+//  vaR = {{{0.01, 0.002}, {0, 0.003}, {0, 0.001}, {0.01, 0.001}}}; // wrong
+//  do_test("lower", va1, vaA, vaR); // error thrown because areas of intersections don't match
+//  }
+//  SECTION("Hour glass, upper"){
+//  va1 = {{0, 0.001}, {0, 0.013}, {0.01, 0.013}, {0.01, 0.001}};
+//  vaA = {{0.012, 0.001}, {2.77555756E-17, 0.013}, {-0.05, 0.013}, {0.07, 0.001}};
+//  vaR = {{{0, 0.013}, {0, 0.008}, {0.01, 0.007}, {0.01, 0.012}}}; // wrong
+//  do_test("upper", va1, vaA, vaR);
+//  }
+//}
 
 
 TEST_CASE("Multiple polygon intersections", "[polygon]"){

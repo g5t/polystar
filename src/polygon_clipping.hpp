@@ -222,6 +222,7 @@ namespace polystar::polygon::clip
     auto first_a = lists.first(clip::On::A);
     auto first_b = lists.first(clip::On::B);
     auto ptr_a = first_a;
+    std::cout << "vertices " << v.to_string() << "\n";
     do {
       // Find Edge A
       auto edge_a = std::make_pair(ptr_a->value(), ptr_a->next(clip::On::A, clip::Type::original)->value());
@@ -230,9 +231,14 @@ namespace polystar::polygon::clip
         // Find Edge B
         auto edge_b = std::make_pair(ptr_b->value(), ptr_b->next(clip::On::B, clip::Type::original)->value());
         // Find the intersection point of edge A and edge B
+        std::cout << "Look for intersection of edge (";
+        std::cout << edge_a.first << "," << edge_a.second << ") and (";
+        std::cout << edge_b.first << "," << edge_b.second << ");";
         auto [valid, at] = intersection2d(v, edge_a, v, edge_b);
+        std::cout << " found " << valid << " intersection" << (valid != 1 ? "s": "") << "\n";
         //
         if (valid > 1){
+          std::cout << "all of which are\n" << at.to_string() << "\n";
           // the intersection is of two parallel lines, and two intersection points were returned.
           // they must be one of
           // (a.1st, a.2nd), (a.1st, b.1st), (a.1st, b.2nd), (a.2nd, b.1st), (a.2nd, b.2nd), (b.1st, b.2nd)
@@ -250,6 +256,7 @@ namespace polystar::polygon::clip
           }
         }
         if (valid){
+          std::cout << "which is " << at.to_string(0) << "\n";
           //  1. Add it to the list of all vertices
           auto index = v.size(0);
           auto match = v.row_is(cmp::eq, at);
@@ -278,7 +285,15 @@ namespace polystar::polygon::clip
             // use the following vertex of B to decide
             auto follow = ptr_b->next(clip::On::B, clip::Type::original)->next(clip::On::B, clip::Type::original)->value();
             r = v.view(follow) - a_0;
-            cross = cross2d(r, s).val(0,0);
+            /*
+             * FIXME It is not entirely clear if this is the right course of action.
+             *  There is at least one case, exercised in at least three tests, in which two edges overlap,
+             *  and the right cross product to perform when this stage is reached is cross(s, r) _not_
+             *  cross(r, s) [(]as it was before].
+             *  A counter example could not be identified when this bug was found. If one exists, some other
+             *  method of dealing with indeterminate in-out-ness should be pursued.
+             */
+            cross = cross2d(s, r).val(0,0);
             type = cross > 0 ? clip::Type::entry : cross < 0 ? clip::Type::exit : clip::Type::edge;
           }
           // if the type is still 'edge' we can safely(?) skip including this 'intersection' point in the output
