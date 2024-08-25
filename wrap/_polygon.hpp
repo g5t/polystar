@@ -48,6 +48,7 @@ void define_polygon(py::class_<A> & cls){
   cls.def_property_readonly("area", &A::area);
   cls.def_property_readonly("mirror",&A::mirror);
   cls.def_property_readonly("inverse",&A::inverse);
+  cls.def_property_readonly("is_convex",&A::is_convex);
   cls.def_property_readonly("centroid",[](const A& p){return a2py(p.centroid());});
   cls.def("contains",[](const A& p, const py::array_t<T>& pyv){
     auto v = py2a2(pyv);
@@ -58,7 +59,10 @@ void define_polygon(py::class_<A> & cls){
     return p.translate(v);
   });
   cls.def("intersects",[](const A & p, const A & o){return p.intersects(o);});
-  cls.def("intersection",[](const A& p, const A& o){return p.intersection(o);});
+
+  cls.def("intersection",[](const A& p, const A& o){return polygon_intersection(p, o);});
+  cls.def("convex_intersection",[](const A& p, const A& o){return polygon_convex_intersection(p, o);});
+
   cls.def("simplify",&A::simplify);
   cls.def("triangulate",&A::triangulate);
   cls.def("write_svg", [](const A& p, const std::string filename, const std::string fill, const std::string stroke){
