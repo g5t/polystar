@@ -39,7 +39,7 @@ jobs:
           - {os: ubuntu-22.04, platform: 'manylinux'}
           - {os: ubuntu-22.04, platform: 'musllinux'}
           - {os: macos-13, platform: 'macosx'}      # Intel support
-          - {os: macos-latest, platform: 'macosx'}  # Apple silicon support
+#          - {os: macos-latest, platform: 'macosx'}  # Apple silicon support
 
     steps:
     - uses: actions/checkout@v4
