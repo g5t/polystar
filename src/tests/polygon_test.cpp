@@ -89,7 +89,7 @@ auto make_poly = [](const std::vector<std::array<double, 2>>& va_vertices){
 };
 
 TEST_CASE("Polygon intersections", "[polygon]"){
-  auto do_tests = [](const auto & va1, const auto & va2, const auto & var, const auto var_area){
+  auto do_tests = [](const auto & name, const auto & va1, const auto & va2, const auto & var, const auto var_area){
     auto poly_1 = make_poly(va1);
     auto poly_2 = make_poly(va2);
     auto result = polygon_intersection(poly_1, poly_2);
@@ -98,14 +98,30 @@ TEST_CASE("Polygon intersections", "[polygon]"){
       auto poly_r = make_poly(var);
       REQUIRE(result.size() == 1u);
       auto r = result[0].without_extraneous_vertices();
-      if (r.area() != poly_r.area()){
-        std::cout << "Area mismatch \nresult:\n" << r << "\ndiffers from expected:\n" << poly_r << "\n";
+      if (std::abs(r.area() - poly_r.area()) > 1e-12){
+        std::cout << "Test " << name << "area mismatch \nresult:\n" << r << "\ndiffers from expected:\n" << poly_r << "\n";
       }
       REQUIRE_THAT(r.area(), WithinRel(poly_r.area(), 1e-12));
       REQUIRE_THAT(r.area(), WithinRel(var_area, 1e-12));
       REQUIRE(poly_r == r.without_extraneous_vertices());
     } else {
       REQUIRE(result.empty());
+    }
+  };
+
+  auto do_convex_tests = [](const auto & va1, const auto & va2, const auto & var, const auto var_area) {
+    auto poly_1 = make_poly(va1);
+    auto poly_2 = make_poly(va2);
+    // all polygons are convex, so we can use the other algorithm
+    REQUIRE(poly_1.is_convex());
+    REQUIRE(poly_2.is_convex());
+    auto result = polygon_convex_intersection(poly_1, poly_2);
+
+    REQUIRE_THAT(result.area(), WithinRel(var_area, 1e-12));
+    if (var_area > 0){
+      auto poly_r = make_poly(var);
+      REQUIRE_THAT(result.area(), WithinRel(poly_r.area(), 1e-12));
+      REQUIRE(poly_r == result.without_extraneous_vertices());
     }
   };
 
@@ -118,32 +134,38 @@ TEST_CASE("Polygon intersections", "[polygon]"){
       va_vertices_2 = {{1, 1}, {3, 1}, {3, 3}, {1, 3}};
       va_vertices_r = {{1, 1}, {2, 1}, {2, 2}, {1, 2}};
       area_r = 1.0;
-      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      do_tests("Diagonal offset, corner intersection", va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      do_convex_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
     }
     SECTION("Horizontal offset, edge intersection"){
       va_vertices_2 = {{1, 0}, {3, 0}, {3, 2}, {1, 2}};
       va_vertices_r = {{1, 0}, {2, 0}, {2, 2}, {1, 2}};
       area_r = 2.0;
-      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      do_tests("Horizontal offset, edge intersection", va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      do_convex_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
     }
     SECTION("Intersection at vertex is not a valid Polygon"){
       va_vertices_2 = {{2, 2}, {4, 2}, {4, 4}, {2, 4}};
-      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      do_tests("Intersection at vertex is not a valid Polygon", va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      do_convex_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
     }
     SECTION("Intersection along one edge is not a valid Polygon"){
       va_vertices_2 = {{2, 1}, {4, 1}, {4, 3}, {2, 3}};
-      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      do_tests("Intersection along one edge is not a valid Polygon", va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      do_convex_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
     }
     SECTION("No intersection"){
       va_vertices_2 = {{3, 3}, {5, 3}, {5, 5}, {3, 5}};
-      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      do_tests("No intersection", va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      do_convex_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
     }
     SECTION("Pinch point"){
       va_vertices_1 = {{0, 0}, {2, 0}, {2, 2}, {4, 2}, {4, 4}, {2, 4}, {2, 2}, {0, 2}};
       va_vertices_2 = {{1, 1}, {3, 1}, {3, 3}, {1, 3}};
       va_vertices_r = {{1, 1,}, {2, 1}, {2, 2}, {3, 2}, {3, 3}, {2, 3}, {2, 2}, {1, 2}};
       area_r = 2.0;
-      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      do_tests("Pinch point", va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      // no convex tests since the pinch point makes it non-convex
     }
   }
   SECTION("1x5 Rectangle"){
@@ -152,19 +174,22 @@ TEST_CASE("Polygon intersections", "[polygon]"){
       va_vertices_2 = {{5, 0}, {9, 0}, {4, 5}, {0, 5}};
       va_vertices_r = {{3, 5}, {3, 2}, {4, 1}, {4, 5}};
       area_r = 3.5;
-      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      do_tests("Parallelogram top edge-vertex intersection", va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      do_convex_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
     }
     SECTION("Parallelogram bottom edge-vertex intersection"){
       va_vertices_2 = {{1, 0}, {5, 0}, {0, 5}, {-4, 5}};
       va_vertices_r = {{3, 2}, {3, 0}, {4, 0}, {4, 1}};
       area_r = 1.5;
-      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      do_tests("Parallelogram bottom edge-vertex intersection", va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      do_convex_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
     }
     SECTION("Right parallelogram bottom edge-vertex intersection"){
       va_vertices_2 = {{0, 0}, {4, 0}, {9, 5}, {5, 5}};
       va_vertices_r = {{3, 3}, {3, 0}, {4, 0}, {4, 4}};
       area_r = 3.5;
-      do_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      do_tests("Right parallelogram bottom edge-vertex intersection", va_vertices_1, va_vertices_2, va_vertices_r, area_r);
+      do_convex_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
     }
   }
 
@@ -172,14 +197,13 @@ TEST_CASE("Polygon intersections", "[polygon]"){
 
 TEST_CASE("Polygon intersection reciprocity", "[polygon][reciprocity]"){
 
-  auto do_test = [](const auto & name, const auto &v1, const auto &vA, const auto &vR){
+  auto do_test = [](const auto &v1, const auto &vA, const auto &vR){
     auto poly_1 = make_poly(v1);
     auto poly_A = make_poly(vA);
 
     REQUIRE(poly_1.area() > 0);
     REQUIRE(poly_A.area() > 0);
-
-    std::cout << name << " Poly1:\n" << poly_1 << "\n" << name << " PolyA:\n" << poly_A << "\n";
+//    std::cout << name << " Poly1:\n" << poly_1 << "\n" << name << " PolyA:\n" << poly_A << "\n";
 
     auto int_1A = polygon_intersection(poly_1, poly_A);
     auto int_A1 = polygon_intersection(poly_A, poly_1);
@@ -188,11 +212,10 @@ TEST_CASE("Polygon intersection reciprocity", "[polygon][reciprocity]"){
     for (size_t i=0; i < int_1A.size(); ++i){
       auto p1A = int_1A[i].without_extraneous_vertices();
       auto pA1 = int_A1[i].without_extraneous_vertices();
-      std::cout << name << " " << i << " 1A:\n" << p1A << "\n" << name << " " << i << " A1:\n" << pA1 << "\n";
+//      std::cout << name << " " << i << " 1A:\n" << p1A << "\n" << name << " " << i << " A1:\n" << pA1 << "\n";
       REQUIRE_THAT(p1A.area(), WithinRel(p1A.area(), 1e-14));
       REQUIRE(p1A == pA1);
     }
-
     if (!vR.empty()){
       REQUIRE(vR.size() == int_1A.size());
       for (size_t i = 0; i < vR.size(); ++i){
@@ -200,10 +223,24 @@ TEST_CASE("Polygon intersection reciprocity", "[polygon][reciprocity]"){
         REQUIRE_THAT(int_1A[i].area(), WithinRel(poly_R.area(), 1e-12));
         REQUIRE(int_1A[i].without_extraneous_vertices() == poly_R);
       }
-
     }
-
   };
+  auto do_convex_tests = [](const auto & v1, const auto & vA, const auto & vR) {
+    auto poly_1 = make_poly(v1);
+    auto poly_A = make_poly(vA);
+    // all polygons are convex, so we can use the other algorithm
+    REQUIRE(poly_1.is_convex());
+    REQUIRE(poly_A.is_convex());
+    auto r_1A = polygon_convex_intersection(poly_1, poly_A);
+    auto r_A1 = polygon_convex_intersection(poly_A, poly_1);
+    REQUIRE_THAT(r_1A.area(), WithinRel(r_A1.area(), 1e-12));
+    REQUIRE(r_1A == r_A1);
+
+    auto poly_r = make_poly(vR);
+    REQUIRE_THAT(r_1A.area(), WithinRel(poly_r.area(), 1e-12));
+    REQUIRE(poly_r == r_1A);
+  };
+
 
   std::vector<std::array<double, 2>> va1, vaA;
   std::vector<std::vector<std::array<double, 2>>> vaR;
@@ -220,7 +257,8 @@ TEST_CASE("Polygon intersection reciprocity", "[polygon][reciprocity]"){
       vaR = {
           {{0.01, 0.002}, {0, 0.003}, {0, 0.001}, {0.01, 0.001}}
       };
-      do_test("lower", va1, vaA, vaR); // error thrown because areas of intersections don't match
+      do_test(va1, vaA, vaR);
+      do_convex_tests(va1, vaA, vaR[0]);
     }
     SECTION("On-border points, upper") {
       vaA = {{-0.05,          0.013},
@@ -228,9 +266,10 @@ TEST_CASE("Polygon intersection reciprocity", "[polygon][reciprocity]"){
              {0.07,           0.001},
              {2.77555756E-17, 0.013},};
       vaR = {
-          {{0, 0.013}, {0, 0.008}, {0.01, 0.007}, {0.01, 0.012}}
+          {{0, 0.013}, {0, 0.003322580645161289}, {0.01, 0.0013870967741935471}, {0.01, 0.011285714285714291}}
       };
-      do_test("upper", va1, vaA, vaR);
+      do_test(va1, vaA, vaR);
+      do_convex_tests(va1, vaA, vaR[0]);
     }
   }
 }

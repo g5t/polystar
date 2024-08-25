@@ -1222,7 +1222,13 @@ T& Array2<T>::val(const shape_t& p){
 template<class T>
 template<class I>
 T& Array2<T>::val(std::initializer_list<I> l){
-  shape_t idx{l};
+  assert(l.size() == 2);
+  std::vector<ind_t> holder;
+  holder.reserve(l.size());
+  std::transform(l.begin(), l.end(), std::back_inserter(holder), [](auto x){return static_cast<ind_t>(x);});
+  shape_t idx;
+  idx[0] = holder[0];
+  idx[1] = holder[1];
   return this->val(idx);
 }
 

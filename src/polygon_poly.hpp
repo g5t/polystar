@@ -78,6 +78,10 @@ namespace polystar::polygon{
     [[nodiscard]] T circumscribed_radius() const {return wires_.circumscribed_radius(vertices_);}
 
     // methods
+    [[nodiscard]] bool is_convex() const {
+      if (wires_.wire_count()) return false;
+      return wires_.border().is_convex(vertices_);
+    }
     [[nodiscard]] Poly<T,A> convex_hull() const {return Poly(vertices_);}
     /// \brief Remove any internal wires by adding them to the border via new zero-width gaps.
     [[nodiscard]] Poly<T,A> simplify() const {return Poly(vertices_, wires_.simplify(vertices_));}
@@ -202,6 +206,9 @@ namespace polystar::polygon{
     }
 
     [[nodiscard]] std::vector<Poly<T,A>> intersection(const Poly<T,A>& that, T tol = T(0), int dig = 0) const {
+      if (is_convex() && that.is_convex()){
+        return {wires_convex_intersection(vertices_, wires_.border(), that.vertices(), that.wires().border())};
+      }
       // simple-case checks first: ignore the possibility of negative polygon inclusion?
       auto that_in_this = border_contains(that.vertices());
       if (std::all_of(that_in_this.begin(), that_in_this.end(), [](const auto x){return x;})) {
@@ -426,7 +433,7 @@ namespace polystar::polygon{
     // Construct the dual doubly-linked lists of vertex indices
     auto lists = clip::VertexLists(new_wa, new_wb);
     v = clip::weiler_atherton(v, lists); // updates v with intersection points
-    std::cout << "Result of Weiler-Atherton, vertices:\n" << v.to_string() << "lists:\n" << lists << "\n";
+//    std::cout << "Result of Weiler-Atherton, vertices:\n" << v.to_string() << "lists:\n" << lists << "\n";
     auto wires = lists.intersection_wires();
     std::vector<Poly<T, A>> result;
     result.reserve(wires.size());
@@ -435,6 +442,23 @@ namespace polystar::polygon{
       if (p.area()) result.push_back(p);
     }
     return result;
+  }
+
+  /// \brief Find and return the intersection polygon for two convex polygon wires
+  template<class T, template<class> class A>
+  Poly<T, A>
+  wires_convex_intersection(const A<T> & va, const Wire & wa, const A<T> & vb, const Wire & wb){
+    auto [vertices, wire] = clip::orourke_chien_olsen_naddor(va, wa, vb, wb);
+    return Poly(vertices, wire);
+  }
+
+  template<class T, template<class> class A>
+  Poly<T, A>
+  polygon_convex_intersection(const Poly<T, A> & a, const Poly<T, A> & b){
+    if (!a.is_convex() || !b.is_convex()){
+      throw std::logic_error("Provided polygons are not both convex!");
+    }
+    return wires_convex_intersection(a.vertices(), a.wires().border(), b.vertices(), b.wires().border());
   }
 
   /// \brief Find the intersection of two polygons, triangulating if either has any holes

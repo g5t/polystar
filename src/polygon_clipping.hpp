@@ -41,6 +41,7 @@ namespace polystar::polygon::clip
 
     [[nodiscard]] ind_t value() const { return _value; }
     [[nodiscard]] Type vertex_type() const { return _type; }
+    void vertex_type(Type type) {_type = type;}
     [[nodiscard]] bool visited() const { return _visited; }
     void visited(bool v) { _visited = v; }
 
@@ -218,11 +219,56 @@ namespace polystar::polygon::clip
 
   template<class T, template<class> class A>
   A<T> weiler_atherton(A<T> & v, VertexLists & lists){
+    auto insert_point = [&v, &lists](const auto & point, const auto & eA, const auto & eB, auto & pA, auto & pB){
+//      std::cout << "which is " << point.to_string(0) << "\n";
+      //  1. Add it to the list of all vertices
+      auto index = v.size(0);
+      auto match = v.row_is(cmp::eq, point);
+      std::shared_ptr<clip::Vertex> match_ptr{nullptr};
+      if (match.any()){
+        // the intersection point is already in the list of vertices
+        index = match.first();
+        // see if this point was already added to lists as entry or exit type, and shortcut out if it has
+        // we can walk either wire
+        auto w = lists.first(On::A);
+        auto w_first = w;
+        do {
+          if (w->value() == index){
+            auto t = w->vertex_type();
+            if (clip::Type::exit == t || clip::Type::entry == t) return;
+            if (clip::Type::edge == t) match_ptr = w;
+          }
+          w = w->next(On::A);
+        } while (w != w_first && w != nullptr);
+      } else {
+        // the intersection point is not in the list of vertices
+        index = v.size(0);
+        v = v.append(0, point);
+      }
+      //  2. Find whether it points into or out of A.
+      auto a_0 = v.view(eA.first);
+      auto r = v.view(eB.second) - a_0; // we want to see if edge_b.second is to the right of edge_a
+      auto s = v.view(eA.second) - a_0;
+      auto cross = cross2d(r, s).val(0,0);
+      auto type = cross > 0 ? clip::Type::entry : cross < 0 ? clip::Type::exit : clip::Type::edge;
+      if (match_ptr){
+        if (clip::Type::edge != type) match_ptr->vertex_type(type);
+//        std::cout << "Updated " << match_ptr << "\n";
+        return;
+      }
+
+      //  3. Insert it into the doubly-linked lists of vertices on both A and B
+      auto ptr = std::make_shared<clip::Vertex>(index, type);
+      insert(clip::On::A, pA, eA, ptr, v);
+      insert(clip::On::B, pB, eB, ptr, v);
+//      std::cout << "Inserted " << ptr << "\n";
+    };
+
     // Walk through both lists of vertices, looking for intersections
     auto first_a = lists.first(clip::On::A);
     auto first_b = lists.first(clip::On::B);
     auto ptr_a = first_a;
-    std::cout << "vertices " << v.to_string() << "\n";
+//    std::cout << "vertices " << v.to_string() << "\n";
     do {
       // Find Edge A
       auto edge_a = std::make_pair(ptr_a->value(), ptr_a->next(clip::On::A, clip::Type::original)->value());
@@ -231,77 +277,16 @@ namespace polystar::polygon::clip
         // Find Edge B
         auto edge_b = std::make_pair(ptr_b->value(), ptr_b->next(clip::On::B, clip::Type::original)->value());
         // Find the intersection point of edge A and edge B
-        std::cout << "Look for intersection of edge (";
-        std::cout << edge_a.first << "," << edge_a.second << ") and (";
-        std::cout << edge_b.first << "," << edge_b.second << ");";
+//        std::cout << "Look for intersection of edge (";
+//        std::cout << edge_a.first << "," << edge_a.second << ") and (";
+//        std::cout << edge_b.first << "," << edge_b.second << ");";
         auto [valid, at] = intersection2d(v, edge_a, v, edge_b);
-        std::cout << " found " << valid << " intersection" << (valid != 1 ? "s": "") << "\n";
-        //
-        if (valid > 1){
-          std::cout << "all of which are\n" << at.to_string() << "\n";
-          // the intersection is of two parallel lines, and two intersection points were returned.
-          // they must be one of
-          // (a.1st, a.2nd), (a.1st, b.1st), (a.1st, b.2nd), (a.2nd, b.1st), (a.2nd, b.2nd), (b.1st, b.2nd)
-          // or the reverse or any pair.
-          // We do _not_ want a.1st, so check for any of (a.2nd, b.1st, or b.2nd)
-          /* if a.1st is one of the two vertices, we can unambiguously take the other one
-           * otherwise, pick the vertex which is closest to a1.
-           * */
-          auto a1 = v.view(edge_a.first);
-          if (at.row_is(cmp::eq, a1).any()){
-            at = at.extract(at.row_is(cmp::neq, a1));
-          } else {
-            auto diff = norm(at - a1); // a (2, 1) Array2
-            at = at.extract(diff.row_is(cmp::eq, diff.min(0u)));
-          }
-        }
-        if (valid){
-          std::cout << "which is " << at.to_string(0) << "\n";
-          //  1. Add it to the list of all vertices
-          auto index = v.size(0);
-          auto match = v.row_is(cmp::eq, at);
-          if (match.any()){
-            // the intersection point is already in the list of vertices
-            index = match.first();
-          } else {
-            // the intersection point is not in the list of vertices
-            index = v.size(0);
-            v = v.append(0, at);
-          }
+//        std::cout << " found " << valid << " intersection" << (valid != 1 ? "s": "") << "\n";
 
-          //  2. Find whether it points into or out of A.
-          auto a_0 = v.view(edge_a.first);
-          auto r = v.view(edge_b.second) - a_0; // we want to see if edge_b.second is to the right of edge_a
-          auto s = v.view(edge_a.second) - a_0;
-          auto cross = cross2d(r, s).val(0,0);
-          auto type = cross > 0 ? clip::Type::entry : cross < 0 ? clip::Type::exit : clip::Type::edge;
-          if (clip::Type::edge == type){
-            // use the other point on the edge of B to decide if this points in our out
-            r = v.view(edge_b.first) - a_0;
-            cross = cross2d(r, s).val(0,0);
-            type = cross > 0 ? clip::Type::exit : cross < 0 ? clip::Type::entry : clip::Type::edge;
+        if (valid) {
+          for (ind_t i=0; i<at.size(0); ++i){
+            insert_point(at.view(i), edge_a, edge_b, ptr_a, ptr_b);
           }
-          if (clip::Type::edge == type) {
-            // use the following vertex of B to decide
-            auto follow = ptr_b->next(clip::On::B, clip::Type::original)->next(clip::On::B, clip::Type::original)->value();
-            r = v.view(follow) - a_0;
-            /*
-             * FIXME It is not entirely clear if this is the right course of action.
-             *  There is at least one case, exercised in at least three tests, in which two edges overlap,
-             *  and the right cross product to perform when this stage is reached is cross(s, r) _not_
-             *  cross(r, s) [(]as it was before].
-             *  A counter example could not be identified when this bug was found. If one exists, some other
-             *  method of dealing with indeterminate in-out-ness should be pursued.
-             */
-            cross = cross2d(s, r).val(0,0);
-            type = cross > 0 ? clip::Type::entry : cross < 0 ? clip::Type::exit : clip::Type::edge;
-          }
-          // if the type is still 'edge' we can safely(?) skip including this 'intersection' point in the output
-
-          //  3. Insert it into the doubly-linked lists of vertices on both A and B
-          auto ptr = std::make_shared<clip::Vertex>(index, type);
-          insert(clip::On::A, ptr_a, edge_a, ptr, v);
-          insert(clip::On::B, ptr_b, edge_b, ptr, v);
         }
         // move to the next original wire vertex on B
         ptr_b = ptr_b->next(clip::On::B, clip::Type::original);
@@ -309,7 +294,132 @@ namespace polystar::polygon::clip
       // move to the next original wire vertex on A
       ptr_a = ptr_a->next(clip::On::A, clip::Type::original);
     } while (ptr_a != first_a);
+
+    // try to handle any edge vertices
+    int excess{0}, edge_vertices{0}, total_vertices{0};
+    auto p = lists.first(On::A);
+    auto p_first = p;
+    do{
+      switch (p->vertex_type()){
+        case clip::Type::entry: ++excess; break;
+        case clip::Type::exit: --excess; break;
+        case clip::Type::edge: ++edge_vertices; break;
+        default: ++total_vertices;
+      }
+      p = p->next(On::A);
+    } while (p != p_first && p != nullptr);
+
+    while (excess && edge_vertices > 0){
+      p = p_first;
+      do{
+        if (p->vertex_type() == clip::Type::edge) {
+          p->vertex_type(excess > 0 ? clip::Type::exit : clip::Type::entry);
+          --edge_vertices;
+          excess > 0 ? --excess : ++excess;
+        }
+        p = p->next(On::A);
+      } while (p != p_first && p != nullptr && excess && edge_vertices > 0);
+    }
+
     return v;
+  }
+
+  enum class Inside {neither, A, B};
+
+  /** \brief Implement the edge chasing algorithm from Computer Graphics and Image Processing 19, 384 (1982)
+   *
+   * An algorithm is outlined in 'A New Linear Algorithm for Intersecting Convex Polygons' which can find the
+   * intersection wire of two convex polygons (with N and M points, respectively) in no worse than 2(N+M) steps.
+   * It relies on finding pairwise edge intersections between the two polygons, progressing through edge pairs via
+   * a heuristic that favors the edge that points _towards_ the other polygon.
+   */
+  template<class T, template<class> class A>
+  std::pair<A<T>, Wire>
+  orourke_chien_olsen_naddor(const A<T> & va, const Wire & wa, const A<T> & vb, const Wire & wb){
+    auto N = wa.size();
+    auto M = wb.size();
+    A<T> found(0, 2); // no more than (N-1)*(M-1) edge intersections ... but there is no constructor which allocates this
+    Wire wire;
+    size_t maximum = 2 * (N+M);
+    wire.reserve(maximum);
+
+    auto half_plane = [](const auto & v, const auto & e, const auto & x){
+      auto p_minus = v.view(e.first);
+      auto p = v.view(e.second) - p_minus;
+      auto y = x - p_minus;
+      return cross2d(p, y).val(0, 0) >= 0;
+    };
+    auto add_found = [&found](const auto & x){
+      auto match = found.row_is(cmp::eq, x.view(0));
+      if (match.any()){
+        return match.first();
+      }
+      found.append(0, x.view(0));
+//      std::cout << found.to_string() << "\n";
+      return found.size(0u) - 1;
+    };
+    auto add_wire = [&wire](const auto index){
+      if (wire.empty() || wire.back() != index) wire.push_back(index);
+    };
+    auto add = [&add_wire, &add_found](const auto & x){
+      add_wire(add_found(x));
+    };
+
+    size_t p{0}, q{0};
+    Inside inside{Inside::neither};
+    do {
+      auto ea = wa.edge(p);
+      auto eb = wb.edge(q);
+//      std::cout << "p=" << p << " q=" << q << " ";
+//      std::cout << "Edges (" << ea.first << ", " << ea.second << ") and (" << eb.first << ", " << eb.second << ")\n";
+      auto [intersections, at] = intersection2d(va, ea, vb, eb, end_type::both, end_type::both);
+      if (intersections == 1){
+        // not collinear and intersecting:
+        auto index = add_found(at.view(0));
+//        std::cout << intersections << " Intersection of (" << ea.first << ", " << ea.second << ") and (";
+//        std::cout << eb.first << ", " << eb.second << ") at " << at.to_string(0) << " has index " << index << "\n";
+        if (!wire.empty() && 0 != wire.back() && 0 == index){
+          // we're done -- return the vertices found up to this point
+          return {found, wire};
+        }
+        // append this vertex, if we haven't repeated a point:
+        add_wire(index);
+        // do half-plane check
+        inside = half_plane(vb, eb, va.view(ea.second)) ? Inside::A : Inside::B; // edge_a ends in edge_b's half plane?
+//        std::cout << "Such that " << (Inside::A == inside ? "A" : "B") << " is inside now\n";
+      }
+      // if B x A >= 0, advance(B if A in half plane of B else A), else advance(A if B in half-plane of A else B)
+      auto q_vec = vb.view(eb.second) - vb.view(eb.first);
+      auto p_vec = va.view(ea.second) - va.view(ea.first);
+      auto c = cross2d(q_vec, p_vec).val(0, 0);
+      auto a_in_b = half_plane(vb, eb, va.view(ea.second));
+      auto b_in_a = half_plane(va, ea, vb.view(eb.second));
+//      std::cout << "Edge cross product " << c << " and half plane inclusions (a in b) = " << a_in_b << " and (b in a) = " << b_in_a << "\n";
+      auto advance_b = c < 0 ? !b_in_a : a_in_b;
+      if (advance_b){
+//        std::cout << "Advance b";
+        if (Inside::B == inside) {
+//          std::cout << " inserting " << eb.second;
+          add(vb.view(eb.second));
+        }
+        ++q;
+//        std::cout << " such that q is " << q << "\n";
+      } else { // advance_a
+//        std::cout << "Advance a";
+        if (Inside::A == inside) {
+//          std::cout << " inserting " << ea.second;
+          add(va.view(ea.second));
+        }
+        ++p;
+//        std::cout << " such that p is " << p << "\n";
+      }
+    } while (p + q < maximum);
+    if (wire.empty()){
+      // no intersections -- return the _inner_ polygon (if there is one)
+      if (wa.contains(vb.view(wb.front()), va).front()) return {vb, wb};
+      if (wb.contains(va.view(wa.front()), vb).front()) return {va, wa};
+    }
+    return {found, wire};
   }
 }
 

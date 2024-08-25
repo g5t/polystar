@@ -66,17 +66,19 @@ namespace polystar::polygon {
 
     template<class T, template<class> class A>
     bool is_convex(const A<T>& x) const {
-      auto a{x.view(vj(0)) - x.view(vi(0))};
-      auto b{x.view(vj(1)) - x.view(vi(1))};
-      T first = cross2d(a, b).val(0,0);
-      a = b;
-      for (size_t i=2; i<size(); ++i){
-        auto second = cross2d(a, b).val(0, 0);
-        b = x.view(vj(i)) - a.view(vi(i));
-        if (first *  second < 0) return false;
-        std::swap(a, b);
-      }
-      return true;
+//      auto a{x.view(vj(0)) - x.view(vi(0))};
+//      auto b{x.view(vj(1)) - x.view(vi(1))};
+//      T first = cross2d(a, b).val(0,0);
+//      a = b;
+//      for (size_t i=2; i<size(); ++i){
+//        auto second = cross2d(a, b).val(0, 0);
+//        b = x.view(vj(i)) - a.view(vi(i));
+//        if (first *  second < 0) return false;
+//        std::swap(a, b);
+//      }
+//      return true;
+      auto wa = wire_winding_number_over_pi(x);
+      return abs(wa) == 2;
     }
 
     bool operator==(const Wire & that) const {
@@ -336,21 +338,25 @@ namespace polystar::polygon {
     std::vector<size_t> winding_number(const A<R> & point, const A<T> & x) const {
       std::vector<size_t> out;
       out.reserve(point.size(0));
+      std::array<ind_t, 2> y_coord {0, 1};
       for (ind_t i=0; i<point.size(0); ++i) {
         size_t wn{0};
+        auto point_i = point.view(i);
+        auto point_y = static_cast<S>(point_i.val(y_coord));
         for (size_t j=0; j<size(); ++j){
           auto e = edge(j);
-          // points are all (x, y)
-          if (static_cast<S>(x.val(e.first, 1)) <= static_cast<S>(point.val(i, 1))) {
-            if(static_cast<S>(x.val(e.second, 1)) > static_cast<S>(point.val(i, 1))) {
+          auto first = x.view(e.first);
+          auto second = x.view(e.second);
+          auto first_y = static_cast<S>(first.val(y_coord));
+          auto second_y = static_cast<S>(second.val(y_coord));
+          if (first_y <= point_y) {
+            if(second_y > point_y) {
               // upwards crossing with infinite horizontal line from point
-              if (cross2d(x.view(e.second) - x.view(e.first),
-                          point.view(i) - x.view(e.first)).sum() > 0) ++wn;
+              if (cross2d(second - first, point_i - first).sum() > 0) ++wn;
             }
           } else {
-            if (static_cast<S>(x.val(e.second, 1) <= point.val(i, 1))) {
-              if (cross2d(x.view(e.second) - x.view(e.first),
-                          point.view(i) - x.view(e.first)).sum() < 0) --wn;
+            if (second_y <= point_y) {
+              if (cross2d(second - first, point_i - first).sum() < 0) --wn;
             }
           }
         }
@@ -358,6 +364,39 @@ namespace polystar::polygon {
       }
       return out;
     }
+
+    template<class T, template<class> class A>
+    T wire_winding_number_over_pi(const A<T> & vertices) const {
+      auto edge_dir = [&](ind_t i){
+        using polystar::math::pi;
+        auto e = edge(i);
+        auto d = vertices.view(e.second) - vertices.view(e.first);
+        return std::atan2(d.val(0, 1),  d.val(0, 0)) / pi;
+      };
+      T no{0};
+      std::optional<T> orientation;
+      auto dir = edge_dir(-1);
+      for (ind_t i=0; i<size(); ++i){
+        auto old_dir = dir;
+        dir = edge_dir(i);
+        auto angle = dir - old_dir;
+        if (angle <= -1){
+          angle += 2;
+        } else if (angle > 1){
+          angle -= 2;
+        }
+        if (orientation.has_value()){
+          if (orientation.value() * angle <= 0.) return 0;
+        } else {
+          if (angle == 0.) return 0;
+          orientation = angle > 0 ? 1. : -1.;
+        }
+        no += angle;
+      }
+      return no;
+    }
+
+
 
     template<class T, class R, template<class> class A>
     std::vector<bool> is_on(const A<R> & point, const A<T> & x) const {

@@ -1116,6 +1116,7 @@ namespace polystar {
    * \note
    * The inclusivity refers to the end points of the `first` or `second` **edge**, not the first or second point on
    * one of the edges!
+   * The validity controls whether the first or second point on each edge is a valid intersection.
    * */
   enum class end_type {both, first, second, neither};
 
@@ -1123,7 +1124,8 @@ namespace polystar {
     std::pair<size_t, A<T>>
     intersection2d(const A<T>& va, const std::pair<ind_t, ind_t> & pa,
                    const A<T> & vb, const std::pair<ind_t, ind_t> & pb,
-                   end_type inclusive = end_type::both){
+                   end_type inclusive = end_type::both,
+                   end_type validity = end_type::second){
       auto p = va.view(pa.first);
       auto r = va.view(pa.second) - p;
       auto q = vb.view(pb.first);
@@ -1164,11 +1166,16 @@ namespace polystar {
         return std::make_pair(0u, A<T>());
       }
       // not collinear, so they *do* intersect somewhere
-      auto t = static_cast<double>(cross2d(qp, s).val(0, 0)) / static_cast<double>(r_x_s);
-      auto u = static_cast<double>(cross2d(qp, r).val(0, 0)) / static_cast<double>(r_x_s);
-      // always exclude 0 so that only one end of successive edges can be matched
-      bool t_valid{(0 < t && t < 1) || (lok && t == 1)};
-      bool u_valid{(0 < u && u < 1) || (rok && u == 1)};
+      auto r_x_s_norm = static_cast<double>(r_x_s); // normalize s & r first for numerical stability near t or u = 1.0
+      auto t = static_cast<double>(cross2d(qp, s/r_x_s_norm).sum());
+      auto u = static_cast<double>(cross2d(qp, r/r_x_s_norm).sum());
+      bool t_valid{(0 < t && t < 1)};
+      bool u_valid{(0 < u && u < 1)};
+      bool first_ok{end_type::both == validity || end_type::first == validity};
+      bool second_ok{end_type::both == validity || end_type::second == validity};
+      if (!t_valid && ((first_ok && t == 0) || (second_ok && t == 1))) t_valid = true;
+      if (!u_valid && ((first_ok && u == 0) || (second_ok && u == 1))) u_valid = true;
+
       bool valid{u_valid && t_valid};
       auto x  = p + t * r;
 //      if (verbose && valid)
