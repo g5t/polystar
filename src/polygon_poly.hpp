@@ -7,6 +7,7 @@
 )
 #endif
 
+#include <utility>
 #include <vector>
 #include <array>
 #include <optional>
@@ -45,13 +46,25 @@ namespace polystar::polygon{
       finish_convex_hull(tol, dig);
     }
     // Simple polygon constructors
-    Poly(const vertex_t & v, wires_t::wire_t w): vertices_(v), wires_(w) {}
-    Poly(vertex_t && v, wires_t::wire_t && w): vertices_(std::move(v)), wires_(std::move(w)) {}
+    Poly(const vertex_t & v, wires_t::wire_t w): vertices_(v), wires_(std::move(w)) {
+      check_wire_indexing();
+    }
+    Poly(vertex_t && v, wires_t::wire_t && w): vertices_(std::move(v)), wires_(std::move(w)) {
+      check_wire_indexing();
+    }
     // Complex polygon constructors
-    Poly(const vertex_t & v, wires_t::wire_t b, const wires_t::proto_t & w): vertices_(v), wires_(b, w) {}
-    Poly(vertex_t && v, wires_t::wire_t && b, wires_t::proto_t && w): vertices_(std::move(v)), wires_(std::move(b), std::move(w)) {}
-    Poly(const vertex_t & v, const wires_t & w): vertices_(v), wires_(w) {}
-    Poly(vertex_t && v, wires_t && w): vertices_(std::move(v)), wires_(std::move(w)) {}
+    Poly(const vertex_t & v, wires_t::wire_t b, const wires_t::proto_t & w): vertices_(v), wires_(std::move(b), w) {
+      check_wire_indexing();
+    }
+    Poly(vertex_t && v, wires_t::wire_t && b, wires_t::proto_t && w): vertices_(std::move(v)), wires_(std::move(b), std::move(w)) {
+      check_wire_indexing();
+    }
+    Poly(const vertex_t & v, const wires_t & w): vertices_(v), wires_(w) {
+      check_wire_indexing();
+    }
+    Poly(vertex_t && v, wires_t && w): vertices_(std::move(v)), wires_(std::move(w)) {
+      check_wire_indexing();
+    }
     // Copy constructor
     Poly(const Poly<T,A> & that): vertices_(that.vertices_), wires_(that.wires_) {}
     Poly(Poly<T,A> & that) noexcept: vertices_(that.vertices_), wires_(std::move(that.wires_)) {}
@@ -307,6 +320,16 @@ namespace polystar::polygon{
 #endif
 
   private:
+    void check_wire_indexing() const {
+      // Ensure that only indexable vertices are included in the wires -- protect against user error.
+      if (wires_.indexing_error(vertices_)) {
+        debug_update("Maximum vertex index = ", vertices_.size(0u), " but wires are ", wires_.border());
+        if (wires_.wire_count()) {
+          for (const auto & w: wires_.wires()) debug_update(w);
+        }
+        throw std::runtime_error("Check input wire information for indexing error");
+      }
+    }
     void finish_convex_hull(const T, const int){
       // check for unused vertices and remove them
       auto present = wires_.indexes(); // unordered list of wires_ indexes present/used

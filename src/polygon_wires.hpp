@@ -286,6 +286,14 @@ namespace polystar::polygon {
       return std::make_tuple(a, b);
     }
 
+
+    template<class T, template<class> class A, class U = typename A<T>::shape_t>
+    [[nodiscard]] bool indexing_error(const A<T> &x) const {
+      if (border_.indexing_error(x)) return true;
+      if (wires_.has_value()) for (const auto & w: *wires_) if (w.indexing_error(x)) return true;
+      return false;
+    }
+
     template<class T, template<class> class A, class U = typename A<T>::shape_t>
     [[nodiscard]] T area(const A<T> &x) const {
       auto result = border_.area(x);

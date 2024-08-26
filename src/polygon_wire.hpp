@@ -22,11 +22,14 @@ namespace polystar::polygon {
     using edge_t = std::pair<ind_t, ind_t>;
     using base_t = std::vector<ind_t>;
   private:
-    inline ind_t vi(size_t i) const { return operator[](i % size()); }
-    inline ind_t vj(size_t i) const { return operator[]((i + 1) % size()); }
+    /// \brief Return the ith entry, respecting cyclic boundary conditions
+    [[nodiscard]] inline ind_t vi(size_t i) const { return operator[](i % size()); }
+    /// \brief Return (i+1)th entry, respecting cyclic boundary conditions
+    [[nodiscard]] inline ind_t vj(size_t i) const { return operator[]((i + 1) % size()); }
 
   public:
-    inline edge_t edge(size_t i) const { return std::make_pair(vi(i), vj(i)); }
+    /// \brief Return the ith edge pair, which is the ith and (i+1)th entries in that order
+    [[nodiscard]] inline edge_t edge(size_t i) const { return std::make_pair(vi(i), vj(i)); }
 
     // apparently the empty constructor is needed for explicitness?
     explicit Wire() {}
@@ -63,6 +66,14 @@ namespace polystar::polygon {
     }
 
     std::back_insert_iterator <base_t> appender() { return std::back_insert_iterator<base_t>(*this); }
+
+    /// \brief Check whether the wire would give an out-of-bounds indexing error if accessing the provided Array2
+    template<class T, template<class> class A>
+    bool indexing_error(const A<T>& x) const {
+      if (empty()) return false;
+      auto max_ptr = std::max_element(begin(), end());
+      return *max_ptr >= x.size(0u);
+    }
 
     template<class T, template<class> class A>
     bool is_convex(const A<T>& x) const {
@@ -276,6 +287,12 @@ namespace polystar::polygon {
 
     template<class T, template<class> class A>
     T area(const A<T> &x) const {
+      if (empty()) return 0;
+      auto max_ptr = std::max_element(begin(), end());
+      if (*max_ptr >= x.size(0u)) {
+        debug_update("Wire points\n", x.to_string(),"and wire", *this);
+        throw std::runtime_error("Wire::area attempting to access out-of-bounds element of Array2");
+      }
       T a{0};
       for (size_t i = 0; i < size(); ++i) {
         a += cross2d(x.view(vi(i)), x.view(vj(i))).val(0, 0);
