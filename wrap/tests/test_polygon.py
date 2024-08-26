@@ -118,6 +118,20 @@ class PolygonTestCase(TestCase):
         self.assertEqual(exp0, pb0[0])
         self.assertEqual(exp1, pb1[0])
 
+    def test_self_intersection(self):
+        from polystar import Polygon
+        poly = Polygon([(1, 7), (1, 4), (2, 3), (2, 6)], [0, 1, 2, 3])
+
+        self.assertTrue(poly.is_convex)
+        self.assertTrue(poly.intersects(poly))
+
+        inter = poly.intersection(poly)
+        self.assertEqual(len(inter), 1)
+        self.assertEqual(inter[0], poly)
+
+        cinter = poly.convex_intersection(poly)
+        self.assertEqual(cinter, poly)
+
 
 if __name__ == '__main__':
     import unittest

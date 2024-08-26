@@ -62,6 +62,10 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Debug)
 endif(NOT CMAKE_BUILD_TYPE)
 
+if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+    add_definitions(-DDEBUG)
+endif()
+
 if (${POLYSTAR_LOGLEVEL} STREQUAL "VERBOSE")
   message(STATUS "Verbose logging emitted at runtime")
   add_definitions(-DVERBOSE)

@@ -57,11 +57,12 @@ namespace polystar {
 
 #if !defined(DOXYGEN_SHOULD_SKIP_THIS)
   template<class T>
-  inline std::enable_if_t<!std::is_unsigned_v<T>, bool>
+  inline std::enable_if_t<std::is_arithmetic_v<T> && !std::is_unsigned_v<T>, bool>
   is_negative(const T x){ return x < 0; }
   template<class T>
   inline std::enable_if_t<std::is_unsigned_v<T>, bool>
   is_negative(const T){ return false; }
+  template<class T> inline std::enable_if_t<!std::is_arithmetic_v<T>, bool> is_negative(const T){return false;}
 #endif
 #if defined(DOXYGEN_SHOULD_SKIP_THIS)
   /*! \brief Return the if a scalar is negative

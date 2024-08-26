@@ -79,6 +79,7 @@ namespace polystar::polygon{
 
     // methods
     [[nodiscard]] bool is_convex() const {
+      debug_update_if(wires_.wire_count(), "Non-convex due to internal wires");
       if (wires_.wire_count()) return false;
       return wires_.border().is_convex(vertices_);
     }
@@ -398,7 +399,37 @@ namespace polystar::polygon{
       auto any_in = std::any_of(in.begin(), in.end(), [](const auto x){return x;});
       auto all_on = std::all_of(on.begin(), on.end(), [](const auto x){return x;});
       // rounding errors can cause a point to be both in and on?!
+      debug_update_if(all_on, "The wires described by\n", v0.to_string(), w0, "\nand\n", v1.to_string(), w1,
+                      "\nare coincident?\n", "any_in=", any_in, " all_either=", all_either(in, on));
       return any_in && !all_on && all_either(in, on);
+    }
+
+    template<class T, template<class> class A> bool
+    second_in_first(const A<T> &v0, const Wire &w0, const A<T> &v1, const Wire &w1){
+      auto pts = v1.extract(w1);
+      auto in = w0.contains(pts, v0);
+      auto on = w0.is_on(pts, v0);
+      auto all_either = [](const auto & x, const auto & y){
+        return std::transform_reduce(x.begin(), x.end(), y.begin(), true,
+            /*reducer*/ [](const auto a, const auto b){return a && b;},
+            /*transformer*/ [](const auto a, const auto b){return a || b;}
+        );
+      };
+      auto any_in = std::any_of(in.begin(), in.end(), [](const auto x){return x;});
+      return any_in && all_either(in, on);
+    }
+
+    template<class T, template<class> class A> bool
+    equivalent(const A<T> & v0, const Wire & w0, const A<T> & v1, const Wire & w1){
+      auto all = [](const auto & x){return std::all_of(x.begin(), x.end(), [](const auto y){return y;});};
+      auto p1 = v1.extract(w1);
+      auto on = w0.is_on(p1, v0);
+      if (all(on)){
+        auto p2 = v0.extract(w0);
+        on = w1.is_on(p2, v1);
+        return all(on) && p2.row_is(cmp::eq, p1).all();
+      }
+      return false;
     }
   }
 
@@ -409,6 +440,10 @@ namespace polystar::polygon{
   wires_intersection(const A<T> & va, const Wire & wa, const A<T> & vb, const Wire & wb){
     // If the two polygons are too far apart, return nothing
     if (utils::could_not_overlap(va, wa, vb, wb)) return {};
+    // If A and B are the same polygon, the following would fail so return either one now
+    if (utils::equivalent(vb, wb, va, wa)){
+      return {Poly<T, A>(va, wa)};
+    }
     // If any of A is inside B and all of A is inside _or_ on the border of B, return A
     if (utils::contains_or_on_border(vb, wb, va, wa)) {
       return {Poly<T, A>(va, wa)};
@@ -433,13 +468,19 @@ namespace polystar::polygon{
     // Construct the dual doubly-linked lists of vertex indices
     auto lists = clip::VertexLists(new_wa, new_wb);
     v = clip::weiler_atherton(v, lists); // updates v with intersection points
-//    std::cout << "Result of Weiler-Atherton, vertices:\n" << v.to_string() << "lists:\n" << lists << "\n";
+    debug_update("Result of Weiler-Atherton, vertices\n", v.to_string(), "lists:\n", lists);
     auto wires = lists.intersection_wires();
     std::vector<Poly<T, A>> result;
     result.reserve(wires.size());
     for (const auto & w: wires) {
       auto p = Poly<T, A>(v, w).without_extraneous_vertices();
       if (p.area()) result.push_back(p);
+    }
+    if (wires.empty()){
+      // if there was no intersection found, we need to make sure one is not inside the other
+      // now allowing for the possibility of all points being on the boundary
+      if (utils::second_in_first(vb, wb, va, wa)) return {Poly<T, A>(va, wa)};
+      if (utils::second_in_first(va, wa, vb, wb)) return {Poly<T, A>(vb, wb)};
     }
     return result;
   }

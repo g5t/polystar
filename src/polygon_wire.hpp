@@ -78,6 +78,7 @@ namespace polystar::polygon {
 //      }
 //      return true;
       auto wa = wire_winding_number_over_pi(x);
+      debug_update_if(abs(wa) != 2, "Winding number ", wa, "pi is not +/-2pi, so this wire is not convex");
       return abs(wa) == 2;
     }
 
@@ -375,11 +376,12 @@ namespace polystar::polygon {
       };
       T no{0};
       std::optional<T> orientation;
-      auto dir = edge_dir(-1);
+      auto dir = edge_dir(size()-1); // starting direction is given by _last_ edge
       for (ind_t i=0; i<size(); ++i){
         auto old_dir = dir;
         dir = edge_dir(i);
         auto angle = dir - old_dir;
+        debug_update("i=",i," dir=",dir," old_dir=",old_dir," angle=",angle);
         if (angle <= -1){
           angle += 2;
         } else if (angle > 1){
@@ -392,6 +394,7 @@ namespace polystar::polygon {
           orientation = angle > 0 ? 1. : -1.;
         }
         no += angle;
+        debug_update("->angle=",angle," no=",no);
       }
       return no;
     }

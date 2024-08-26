@@ -192,6 +192,28 @@ TEST_CASE("Polygon intersections", "[polygon]"){
       do_convex_tests(va_vertices_1, va_vertices_2, va_vertices_r, area_r);
     }
   }
+  SECTION("1x3 Parallelogram"){
+    va_vertices_1 = {{1, 7}, {1, 4}, {2, 3}, {2, 6}};
+    SECTION("Self intersection"){
+      area_r = 3.0;
+      do_tests("1x3 Parallelogram self intersection", va_vertices_1, va_vertices_1, va_vertices_1, area_r);
+      do_convex_tests(va_vertices_1, va_vertices_1, va_vertices_1, area_r);
+    }
+    SECTION("Similar lozenge"){
+      va_vertices_2 = {{1.5, 7.}, {1., 7.}, {1., 4}, {1.5, 3.}, {2., 3.}, {2., 6.}};
+      area_r = 3.0;
+      do_tests("1x3 Parallelogram with larger polygon",
+               va_vertices_1, va_vertices_2, va_vertices_1, area_r);
+      do_convex_tests(va_vertices_1, va_vertices_2, va_vertices_1, area_r);
+    }
+    SECTION("Similar parallelogram"){
+      va_vertices_2 = {{1.00000095, 7.}, {1., 7.}, {1., 3.99999905}, {1.99999905, 3.}, {2., 3.}, {2., 6.00000095}};
+      area_r = 3.0;
+      do_tests("1x3 Parallelogram with slightly larger similar parallelogram",
+               va_vertices_1, va_vertices_2, va_vertices_1, area_r);
+      do_convex_tests(va_vertices_1, va_vertices_2, va_vertices_1, area_r);
+    }
+  }
 
 }
 

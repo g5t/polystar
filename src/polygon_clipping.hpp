@@ -220,7 +220,7 @@ namespace polystar::polygon::clip
   template<class T, template<class> class A>
   A<T> weiler_atherton(A<T> & v, VertexLists & lists){
     auto insert_point = [&v, &lists](const auto & point, const auto & eA, const auto & eB, auto & pA, auto & pB){
-//      std::cout << "which is " << point.to_string(0) << "\n";
+      debug_update("which is", point.to_string(0));
       //  1. Add it to the list of all vertices
       auto index = v.size(0);
       auto match = v.row_is(cmp::eq, point);
@@ -253,6 +253,7 @@ namespace polystar::polygon::clip
       auto type = cross > 0 ? clip::Type::entry : cross < 0 ? clip::Type::exit : clip::Type::edge;
       if (match_ptr){
         if (clip::Type::edge != type) match_ptr->vertex_type(type);
+        debug_update("Updated ", match_ptr);
 //        std::cout << "Updated " << match_ptr << "\n";
         return;
       }
@@ -261,6 +262,7 @@ namespace polystar::polygon::clip
       auto ptr = std::make_shared<clip::Vertex>(index, type);
       insert(clip::On::A, pA, eA, ptr, v);
       insert(clip::On::B, pB, eB, ptr, v);
+      debug_update("Inserted ", ptr);
 //      std::cout << "Inserted " << ptr << "\n";
     };
 
@@ -268,6 +270,7 @@ namespace polystar::polygon::clip
     auto first_a = lists.first(clip::On::A);
     auto first_b = lists.first(clip::On::B);
     auto ptr_a = first_a;
+    debug_update("vertices ", v.to_string());
 //    std::cout << "vertices " << v.to_string() << "\n";
     do {
       // Find Edge A
@@ -277,10 +280,12 @@ namespace polystar::polygon::clip
         // Find Edge B
         auto edge_b = std::make_pair(ptr_b->value(), ptr_b->next(clip::On::B, clip::Type::original)->value());
         // Find the intersection point of edge A and edge B
+        debug_update("Look for intersection of edge ", edge_a, " and ", edge_b);
 //        std::cout << "Look for intersection of edge (";
 //        std::cout << edge_a.first << "," << edge_a.second << ") and (";
 //        std::cout << edge_b.first << "," << edge_b.second << ");";
         auto [valid, at] = intersection2d(v, edge_a, v, edge_b);
+        debug_update("Found ", valid, " intersection", (valid != 1 ? "s" : ""));
 //        std::cout << " found " << valid << " intersection" << (valid != 1 ? "s": "") << "\n";
 
         if (valid) {
