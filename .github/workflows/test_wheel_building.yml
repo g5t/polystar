@@ -1,0 +1,45 @@
+name: Meta Test
+
+on:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash -l {0}
+
+jobs:
+  cibuildwheel:
+    name: "${{ matrix.variant.platform }} on ${{ matrix.variant.os }}"
+    runs-on: ${{ matrix.variant.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - { os: macos-14, platform: 'macosx' }  # Apple silicon support
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: 3.8
+      if: runner.os == 'macOS' && runner.arch == 'ARM64'
+
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
+
+    - uses: pypa/cibuildwheel@v2.20.0
+      env:
+        CIBW_BUILD: "*-${{ matrix.variant.platform }}*"
+        MACOSX_DEPLOYMENT_TARGET: "10.15"
+
+    - name: Verify clean directory
+      run: git diff --exit-code
+      shell: bash
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: "cibw-wheels-${{ matrix.variant.platform }}-${{ matrix.variant.os }}"
+        path: wheelhouse/*.whl
