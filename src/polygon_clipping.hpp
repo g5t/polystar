@@ -220,7 +220,7 @@ namespace polystar::polygon::clip
   template<class T, template<class> class A>
   A<T> weiler_atherton(A<T> & v, VertexLists & lists){
     auto insert_point = [&v, &lists](const auto & point, const auto & eA, const auto & eB, auto & pA, auto & pB){
-      info_update("which is", point.to_string(0));
+      debug_update("which is", point.to_string(0));
       //  1. Add it to the list of all vertices
       auto index = v.size(0);
       auto match = v.row_is(cmp::eq, point);
@@ -246,14 +246,18 @@ namespace polystar::polygon::clip
         v = v.append(0, point);
       }
       //  2. Find whether it points into or out of A.
-      auto a_0 = v.view(eA.first);
-      auto r = v.view(eB.second) - a_0; // we want to see if edge_b.second is to the right of edge_a
-      auto s = v.view(eA.second) - a_0;
-      auto cross = cross2d(r, s).val(0,0);
-      auto type = cross > 0 ? clip::Type::entry : cross < 0 ? clip::Type::exit : clip::Type::edge;
+      clip::Type type = clip::Type::edge;
+      if (eA.first != eB.first && eA.second != eB.second && eA.second != eB.first && eB.second != eA.first){
+        // if any indexes match, the cross-product must be zero
+        auto a_0 = v.view(eA.first);
+        auto r = v.view(eB.second) - a_0; // we want to see if edge_b.second is to the right of edge_a
+        auto s = v.view(eA.second) - a_0;
+        auto cross = cross2d(r, s).val(0,0);
+        type = cross > 0 ? clip::Type::entry : cross < 0 ? clip::Type::exit : clip::Type::edge;
+      }
       if (match_ptr){
         if (clip::Type::edge != type) match_ptr->vertex_type(type);
-        info_update("Updated ", match_ptr);
+        debug_update("Updated ", match_ptr);
         return;
       }
 
@@ -261,14 +265,14 @@ namespace polystar::polygon::clip
       auto ptr = std::make_shared<clip::Vertex>(index, type);
       insert(clip::On::A, pA, eA, ptr, v);
       insert(clip::On::B, pB, eB, ptr, v);
-      info_update("Inserted ", ptr);
+      debug_update("Inserted ", ptr);
     };
 
     // Walk through both lists of vertices, looking for intersections
     auto first_a = lists.first(clip::On::A);
     auto first_b = lists.first(clip::On::B);
     auto ptr_a = first_a;
-    info_update("vertices ", v.to_string());
+    debug_update("vertices ", v.to_string());
     do {
       // Find Edge A
       auto edge_a = std::make_pair(ptr_a->value(), ptr_a->next(clip::On::A, clip::Type::original)->value());
@@ -277,9 +281,9 @@ namespace polystar::polygon::clip
         // Find Edge B
         auto edge_b = std::make_pair(ptr_b->value(), ptr_b->next(clip::On::B, clip::Type::original)->value());
         // Find the intersection point of edge A and edge B
-        info_update("Look for intersection of edge ", edge_a, " and ", edge_b);
+        debug_update("Look for intersection of edge ", edge_a, " and ", edge_b);
         auto [valid, at] = intersection2d(v, edge_a, v, edge_b);
-        info_update("Found ", valid, " intersection", (valid != 1 ? "s" : ""));
+        debug_update("Found ", valid, " intersection", (valid != 1 ? "s" : ""));
 
         if (valid) {
           for (ind_t i=0; i<at.size(0); ++i){
