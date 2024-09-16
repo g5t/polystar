@@ -36,10 +36,11 @@ jobs:
       fail-fast: false
       matrix:
         variant:
-          - {os: ubuntu-22.04, platform: 'manylinux'}
-          - {os: ubuntu-22.04, platform: 'musllinux'}
-          - {os: macos-13, platform: 'macosx'}      # Intel support
-#          - {os: macos-latest, platform: 'macosx'}  # Apple silicon support
+          - { os: ubuntu-22.04, platform: 'manylinux' }
+          - { os: ubuntu-22.04, platform: 'musllinux' }
+          - { os: macos-13, platform: 'macosx' }  # Intel support
+          - { os: macos-14, platform: 'macosx' }  # Apple silicon support
+          - { os: windows-2022, platform: "win" }
 
     steps:
     - uses: actions/checkout@v4
