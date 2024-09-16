@@ -62,3 +62,46 @@ def wire_codes_vertices(all_vertices, wire):
     vertices = all_vertices[wire]
     vertices = numpy.vstack((vertices, all_vertices[wire[0]]))
     return codes, vertices
+
+
+
+
+def make_colours(n, color=None):
+    """Construct a list of colors for use in displaying Polygon objects
+
+    Parameters
+    ----------
+    n : int
+        The number of colors required
+    color : Union[List[Union[str, tuple[numbe, number, number]], Union[str, tuple[number, number, number]]
+        If color is not provided, the list of all colors known to matplotlib will be used
+
+    Returns
+    -------
+    List[colors]
+        A length-n list of colors. If the starting value of `color` is less than length-n, it will be tiled to length-n.
+
+    Examples
+    --------
+    >>> make_colours(7, ['red', 'blue', 'green'])
+    ['red', 'blue', 'green', 'red', 'blue', 'green', 'red']
+
+    >>> make_colours(4, 'black')
+    ['black', 'black', 'black', 'black']
+    """
+    if color is None:
+        from matplotlib.colors import get_named_colors_mapping
+        color = get_named_colors_mapping()
+
+    from collections.abc import Iterable
+    if isinstance(color, Iterable):
+        color = list(color)
+    if isinstance(color, str) or (isinstance(color, (list, tuple)) and len(color) == 3):
+        color = [color]
+
+    from numpy import ndarray, array, tile
+    if not isinstance(color, ndarray):
+        color = array(color)
+    if color.shape[0] < n:
+        color = tile(color, 1+n//color.shape[0])
+    return color[0:n]

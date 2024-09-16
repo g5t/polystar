@@ -323,10 +323,10 @@ namespace polystar::polygon{
     void check_wire_indexing() const {
       // Ensure that only indexable vertices are included in the wires -- protect against user error.
       if (wires_.indexing_error(vertices_)) {
-        debug_update("Maximum vertex index = ", vertices_.size(0u), " but wires are ", wires_.border());
-        if (wires_.wire_count()) {
-          for (const auto & w: wires_.wires()) debug_update(w);
-        }
+//        debug_update("Maximum vertex index = ", vertices_.size(0u), " but wires are ", wires_.border());
+//        if (wires_.wire_count()) {
+//          for (const auto & w: wires_.wires()) debug_update(w);
+//        }
         throw std::runtime_error("Check input wire information for indexing error");
       }
     }
