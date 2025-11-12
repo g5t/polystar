@@ -155,7 +155,6 @@ if(POLYSTAR_BUILD_TESTING)
   catch_discover_tests(${TESTING_TARGET})
 endif()
 
-include(polystar-openmp)
 include(polystar-hdf5)
 include(polystar-triangle)
 include(polystar-doxygen)

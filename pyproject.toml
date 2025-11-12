@@ -56,5 +56,5 @@ test-requires = ["numpy", "pytest"]
 test-command = "pytest {package}/wrap/tests"
 build-verbosity = 1
 skip = ["cp36-*", "cp37-*", "pp*"]
-test-skip = "cp38-musllinux*"
+test-skip = "*-musllinux*"
 

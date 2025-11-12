@@ -353,15 +353,13 @@ template<class I, class T> std::complex<T> hermitian_product(const I n, const st
   return h_dot;
 }
 template<class I, class T> std::complex<T> hermitian_product(const I n, const std::complex<T>* a, const std::complex<T>* b){
-  T hr{0}, hi{0};
-  long long sn = u2s<long long>(n);
-  #pragma omp parallel for shared(a,b) reduction(+: hr,hi)
-  for (long long si=0; si<sn; ++si){
-    std::complex<T> h = std::conj(a[si])*b[si];
-    hr += h.real();
-    hi += h.imag();
+  T re{0}, im{0};
+  for (size_t i=0; i<n; ++i) {
+    auto h = std::conj(a[i]) * b[i];
+    re += h.real();
+    im += h.imag();
   }
-  return std::complex<T>(hr,hi);
+  return std::complex<T>(re, im);
 }
 
 
