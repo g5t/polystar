@@ -295,20 +295,6 @@ namespace polystar::polyhedron{
 
     // geometric properties in relation to another point or polyhedron
 
-//    template<class T, class R, template<class> class A, template<class> class B>
-//    [[nodiscard]] std::enable_if_t<isArray<T,A> && isArray<R,B>, std::vector<bool>>
-//    contains(const A<T>& v, const B<R>& x) const {
-//      std::vector<bool> out(x.size(0));
-//      // TODO Move n and p to per-thread variables instead of shared?
-//      auto n = this->face_normals(v);
-//      auto p = this->face_points(v);
-//#pragma omp parallel for default(none) shared(out, n, p, x) schedule(dynamic)
-//      for (ind_t i=0; i<x.size(0); ++i){
-//        // FIXME, consider increasing the tolerance here!
-//        out[i] = dot(n, x.view(i) - p).all(cmp::le, 0.);
-//      }
-//      return out;
-//  }
     template<class T, class R, template<class> class A, template<class> class B>
     [[nodiscard]] std::enable_if_t<isArray<T,A> && isArray<R,B>, std::vector<bool>>
     contains(const A<T>& v, const B<R>& x, const T t=T(0), const int n=1) const {

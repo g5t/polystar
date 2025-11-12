@@ -19,8 +19,6 @@ class PolystarRecipe(ConanFile):
         self.requires("pybind11/2.13.1")
         self.requires("catch2/3.6.0")
         self.requires("highfive/2.9.0")
-        if self.settings.os == "Macos":
-            self.requires("llvm-openmp/11.1.0")
 
     def layout(self):
         cmake_layout(self)
